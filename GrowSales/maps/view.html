@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Grow · Area Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  html,body{margin:0;height:100%;font:13px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#1d232a;background:#eef0f2}
+  button,select,input{font:inherit;color:inherit}
+  #map{position:absolute;inset:0}
+  .leaflet-top.leaflet-left{top:66px}
+
+  /* one slim bar: search, how to colour, filters, what's new */
+  .bar{position:absolute;z-index:1000;top:10px;left:10px;right:10px;height:48px;box-sizing:border-box;display:flex;gap:10px;
+       align-items:center;background:#fff;border-radius:12px;padding:0 8px 0 14px;box-shadow:0 2px 10px rgba(0,0,0,.16)}
+  .isp{font-size:15px;font-weight:800;white-space:nowrap}
+  .search{display:flex;align-items:center;gap:6px;height:34px;padding:0 10px;border-radius:9px;background:#f1f2f4;color:#6b7178;flex:0 1 260px;min-width:120px}
+  .search input{border:0;outline:0;background:transparent;flex:1;min-width:0;font-size:13px;color:#1d232a}
+  .seg{display:flex;gap:2px;padding:3px;border-radius:10px;background:#eceef1}
+  .seg button{height:28px;padding:0 11px;border:0;border-radius:7px;background:transparent;color:#555d66;font-weight:500;cursor:pointer;white-space:nowrap}
+  .seg button.on{background:#fff;color:#1d232a;font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+  .btn{height:34px;padding:0 12px;border:1px solid #d9dce1;border-radius:9px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:7px;font-weight:600;white-space:nowrap}
+  .btn.on{border-color:#1d232a;background:#1d232a;color:#fff}
+  .badge{background:#1d232a;color:#fff;border-radius:9px;padding:0 7px;font-size:11px;line-height:17px}
+  .btn.on .badge{background:#fff;color:#1d232a}
+  .spacer{flex:1}
+  .wrap{position:relative}
+  .pop{position:absolute;top:44px;left:0;width:290px;background:#fff;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.22);padding:14px;
+       display:flex;flex-direction:column;gap:12px;z-index:1100}
+  .pop[hidden]{display:none}
+  .pop h5{margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7178}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chips button{height:30px;padding:0 11px;border:1px solid #d9dce1;border-radius:15px;background:#fff;cursor:pointer;font-weight:500}
+  .chips button.on{background:#1d232a;border-color:#1d232a;color:#fff}
+  .pop select{width:100%;height:32px;border:1px solid #d9dce1;border-radius:8px;background:#fff;padding:0 6px}
+  .pop label.ck{display:flex;gap:8px;align-items:center;cursor:pointer}
+  .pop .foot{display:flex;justify-content:space-between;align-items:center;color:#889;font-size:11px}
+  .pop .foot button{border:0;background:none;color:#1c4fb8;cursor:pointer;font-weight:600;padding:0}
+  .news{height:34px;padding:0 14px;border:1.5px solid #c8106e;border-radius:17px;background:#fff;color:#a3005c;font-weight:700;cursor:pointer;white-space:nowrap}
+  .news.on{background:#c8106e;color:#fff}
+  #drop{height:34px;border:1px solid #d9dce1;border-radius:9px;background:#fff;padding:0 4px;max-width:92px}
+  @media (max-width:1000px){#drop{display:none}}
+
+  /* key, folded into a button until asked for */
+  .key{position:absolute;z-index:1000;left:10px;bottom:22px;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+  .key .box{background:#fff;border-radius:10px;padding:9px 12px;box-shadow:0 1px 6px rgba(0,0,0,.2);font-size:12px;line-height:1.75}
+  .key .box[hidden]{display:none}
+  .key .sw{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:7px;vertical-align:-2px;border:1px solid rgba(0,0,0,.12)}
+  .key .sw.dash{background:#fff;border:2px dashed #111;border-radius:2px}
+  .keybtn{height:32px;padding:0 12px;border:0;border-radius:16px;background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.22);cursor:pointer;display:flex;gap:7px;align-items:center;font-weight:600}
+  .keybtn i{display:inline-block;width:9px;height:9px;border-radius:2px}
+
+  /* the picked area, written out beside the map instead of a popup over it */
+  #panel{position:absolute;z-index:1001;top:68px;right:10px;bottom:22px;width:380px;background:#fff;border-radius:14px;
+         box-shadow:0 6px 24px rgba(0,0,0,.2);display:flex;flex-direction:column;overflow:hidden;animation:slide .16s ease-out}
+  #panel[hidden]{display:none}
+  @keyframes slide{from{transform:translateX(16px);opacity:.4}to{transform:none;opacity:1}}
+  .ph{padding:16px 16px 12px;display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid #eef0f2}
+  .ph h2{margin:0;font-size:21px;line-height:1.2}
+  .ph .sub{color:#6b7178;font-size:12px;margin-top:3px}
+  .x{margin-left:auto;flex:none;width:34px;height:34px;border:1px solid #d9dce1;border-radius:9px;background:#fff;cursor:pointer;font-size:18px;line-height:1}
+  .pb{padding:14px 16px 18px;overflow:auto;display:flex;flex-direction:column;gap:14px}
+  .tag{padding:9px 12px;border-radius:9px;background:#fdebf4;color:#a3005c;font-weight:700;font-size:12px}
+  .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .stat{padding:10px 12px;border-radius:10px;background:#f4f5f7}
+  .stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+  .stat span{font-size:11px;color:#6b7178}
+  .line{font-size:12px;color:#454c54}
+  .cap{font-size:11px;color:#6b7178;margin-bottom:4px}
+  .pb details{border-top:1px solid #eef0f2;padding-top:10px}
+  .pb summary{cursor:pointer;font-weight:700;font-size:13px}
+  .pb table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px;font-variant-numeric:tabular-nums}
+  .pb td,.pb th{padding:3px 0}
+  .pb th{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7178;font-weight:600;text-align:right}
+  .pb th:first-child,.pb td:first-child{text-align:left}
+  .pb td{text-align:right}
+  .pb tr.me td{background:#fff4c2}
+  .who{color:#889;font-size:11px}
+  .pb pre{margin:6px 0 0;padding:8px;background:#f4f5f7;border-radius:6px;max-height:150px;overflow:auto;font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
+  .small{height:30px;padding:0 10px;border:1px solid #d9dce1;border-radius:8px;background:#fff;cursor:pointer;font-weight:600;font-size:12px}
+  .dl{display:flex;flex-direction:column}
+  .dl button{display:flex;gap:10px;align-items:center;padding:9px 4px;border:0;border-bottom:1px solid #eef0f2;background:none;cursor:pointer;text-align:left}
+  .dl button:hover{background:#f7f8fa}
+  .dl .sw{width:10px;height:10px;border-radius:2px;flex:none}
+  .dl .nm{font-weight:700;flex:1}
+  .dl .v{font-variant-numeric:tabular-nums;color:#6b7178}
+  .dl .nw{color:#a3005c;font-weight:800;min-width:44px;text-align:right}
+
+  .lbl{font-weight:700;font-size:11px;color:#111;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff;white-space:nowrap;transform:translate(-50%,-50%)}
+  .zl{font-size:13px;background:rgba(255,255,255,.85);padding:1px 5px;border-radius:4px;text-shadow:none}
+  .nlbl{display:inline-block;font-weight:800;font-size:11px;color:#fff;background:#c8106e;border-radius:4px;padding:1px 5px;
+        white-space:nowrap;transform:translate(-50%,-160%);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .nlbl.grew{background:#fff;color:#a3005c;border:1.5px solid #c8106e}
+
+  @media (max-width:900px){.seg button{padding:0 8px}.search{flex-basis:170px}}
+  @media (max-width:700px){
+    .bar{height:auto;flex-wrap:wrap;padding:8px;gap:8px}
+    .search{flex:1 1 100%}
+    .leaflet-top.leaflet-left{top:112px}
+    #panel{top:auto;left:0;right:0;bottom:0;width:auto;max-height:62%;border-radius:14px 14px 0 0}
+    .key{bottom:14px}
+  }
+</style></head><body>
+<div id="map"></div>
+<div class="bar">
+  <span class="isp"><span class="ispn"></span></span>
+  <label class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+    <input id="q" list="qlist" placeholder="Find an area, street or rep" aria-label="Find an area, street or rep" autocomplete="off"><datalist id="qlist"></datalist></label>
+  <div class="seg" id="modes" role="group" aria-label="Color areas by">
+    <button data-m="rest">Rested</button><button data-m="ready">Ready</button><button data-m="wave">Last worked</button><button data-m="pen">Sold</button>
+  </div>
+  <div class="wrap">
+    <button class="btn" id="fbtn" aria-expanded="false"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16M7 12h10M10 19h4"/></svg>Filters<span class="badge" id="fcount" hidden></span></button>
+    <div class="pop" id="fpanel" hidden>
+      <div><h5>Show only</h5><div class="chips" id="filts">
+        <button data-f="0">All areas</button><button data-f="30">Rested 30+ days</button><button data-f="60">Rested 60+ days</button>
+        <button data-f="90">Rested 90+ days</button><button data-f="fresh">Never knocked</button></div></div>
+      <div><h5>Rep</h5><select id="rep" aria-label="Rep"><option value="">Everyone</option></select></div>
+      <div><h5>More colors</h5><select id="more" aria-label="More colors"><option value="">Pick one</option>
+        <option value="sector">Area colors</option><option value="worked">How much is knocked</option><option value="contact">Answered the door</option></select></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <label class="ck"><input type="checkbox" id="pts"> Every door as a dot</label>
+        <label class="ck"><input type="checkbox" id="outline"> Outline only</label></div>
+      <div class="foot"><span id="meta"></span><button id="freset">Clear filters</button></div>
+    </div>
+  </div>
+  <span class="spacer"></span>
+  <select id="drop" aria-label="Lead drop" hidden></select>
+  <button class="news" id="newsGo" hidden></button>
+</div>
+<div class="key"><div class="box" id="keybox" hidden></div><button class="keybtn" id="keybtn" aria-expanded="false"><span id="keysw"></span>Key</button></div>
+<aside id="panel" hidden aria-live="polite"><div class="ph"><div><h2 id="ptitle"></h2><div class="sub" id="psub"></div></div>
+  <button class="x" id="pclose" aria-label="Close">×</button></div><div class="pb" id="pbody"></div></aside>
+<script type="module">
+const ISP = new URLSearchParams(location.search).get('isp') || 'i3';
+const SRC = new URLSearchParams(location.search).get('src') ||   // ?src= is for local testing
+  'https://cmkfohwbejcztctrpdnt.supabase.co/rest/v1/sector_maps?select=payload&isp=eq.' + encodeURIComponent(ISP);
+const _res = await fetch(SRC, {cache: 'no-cache', headers: {apikey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNta2ZvaHdiZWpjenRjdHJwZG50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNDYyODgsImV4cCI6MjA5NzgyMjI4OH0.waLa5E9a6SMvJ70keY9duAz4VxK39sDNNbmPSSbcebo'}});
+const _j = _res.ok ? await _res.json() : null;
+const _map = Array.isArray(_j) ? (_j[0] || {}).payload : _j;
+if (!_map) { document.body.innerHTML = '<p style="padding:24px;font:14px system-ui">No map for ' + ISP + ' yet.</p>'; throw new Error('no map'); }
+const {data: DATA, pts: PTS, meta: META} = _map;
+document.querySelectorAll('.ispn').forEach(e => e.textContent = META.isp);
+document.title = 'Grow · ' + META.isp + ' Areas';
+
+const FRESH = '#3b6fd8';
+const REST = [[90,'#1a9850','90+ days ago'],[60,'#91cf60','60 to 89'],[30,'#f2d84b','30 to 59'],[14,'#fc8d59','14 to 29'],[0,'#d73027','under 14 days']];
+const restColor = r => r == null || r < 0 ? FRESH : REST.find(x => r >= x[0])[1];
+const isFresh = s => s.never / s.total >= 0.6;
+const DASHED = '<br><span class="sw dash"></span>Part of it knocked in the last 2 weeks';
+const ramp = v => v == null ? '#bbb' : 'hsl(' + 120 * Math.min(1, Math.max(0, v)) + ',70%,45%)';
+const NEWC = '#c8106e';
+const esc = x => String(x == null ? '' : x).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+// rough rested time, the way it gets said out loud: 9 days, 3 weeks, 4 months, 1.2 years
+function rough(d){
+  if (d == null) return 'never knocked';
+  if (d < 14) return d + (d === 1 ? ' day' : ' days');
+  if (d < 60) return Math.round(d / 7) + ' weeks';
+  if (d < 365) return Math.round(d / 30) + ' months';
+  return (d / 365).toFixed(1) + ' years';
+}
+const pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '';
+const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+const MONTHS = ['#7b3294','#c2a5cf','#008837','#a6dba0','#e66101','#fdb863','#5e3c99','#b2abd2','#0571b0','#92c5de','#ca0020','#f4a582'];
+function waveKey(s){ if (!s.wave) return null; const d = new Date(1970,0,1); d.setDate(d.getDate() + s.wave.mid - 719163); return d.getFullYear()*12 + d.getMonth(); }
+function waveLabel(k){ const d = new Date(Math.floor(k/12), k%12, 1); return d.toLocaleString('en-US',{month:'long'}); }
+function dayLbl(iso){ return new Date(iso + 'T12:00').toLocaleString('en-US', {month: 'short', day: 'numeric'}); }
+function ago(iso){ const d = Math.round((Date.parse(META.built + 'T12:00') - Date.parse(iso + 'T12:00')) / 864e5);
+  return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d + ' days ago'; }
+
+const SECTOR = ['#4e79a7','#f28e2b','#59a14f','#e15759','#b07aa1','#edc948','#76b7b2','#ff9da7','#9c755f','#bab0ac'];
+function fill(s, mode){
+  if (mode === 'sector') return SECTOR[s.ci % SECTOR.length];
+  if (mode === 'ready') return ramp(s.ready / s.total);
+  if (mode === 'rest') return isFresh(s) ? FRESH : restColor(s.rest);
+  if (mode === 'wave') { const k = waveKey(s); return k == null ? FRESH : MONTHS[k % 12]; }
+  if (mode === 'worked') return ramp(s.worked / s.total);
+  if (mode === 'contact') return s.worked ? ramp(s.contacts / s.worked / 0.6) : '#bbb';
+  if (mode === 'pen') return ramp(s.sold / s.total / 0.15);
+}
+
+// ---------------------------------------------------------------- state
+let MODE = 'rest', FILT = '0', REP = '', DROP = -1, SEL = null;
+const DROPS = META.drops || [];
+const inDrop = (s, i) => s.born === i ? 'new' : (s.adds && s.adds[i]) ? 'grew' : null;
+const repOf = s => s.reps.find(r => r[0] === REP);
+function passes(s){
+  if (REP && !repOf(s)) return false;
+  if (FILT === '0') return true;
+  if (FILT === 'fresh') return isFresh(s);
+  return !isFresh(s) && s.rest != null && s.rest >= +FILT;
+}
+const filtering = () => FILT !== '0' || !!REP;
+
+// ---------------------------------------------------------------- map
+const map = L.map('map', {preferCanvas: true, zoomControl: true});
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  {maxZoom: 19, attribution: '&copy; OpenStreetMap'}).addTo(map);
+
+const polyLayer = L.layerGroup().addTo(map), zoneLayer = L.layerGroup().addTo(map), labelLayer = L.layerGroup(), zoneLabels = L.layerGroup(), ptsLayer = L.layerGroup();
+for (const z of META.zones){
+  if (!z.poly.length) continue;
+  const zp = L.polygon(z.poly, {weight: 3.5, color: '#111', fill: false, interactive: false}).addTo(zoneLayer);
+  L.marker(z.center || zp.getBounds().getCenter(), {interactive: false, icon: L.divIcon({className: '', html: '<div class="lbl zl">' + esc(z.name) + '</div>', iconSize: [0, 0]})}).addTo(zoneLabels);
+}
+const polys = [];
+let bounds = null;
+for (const s of DATA){
+  const p = L.polygon(s.poly, {weight: 1.5, color: '#222', fillOpacity: 0.45}).addTo(polyLayer);
+  p.bindTooltip(esc(s.name) + ' · ' + s.total + ' doors', {sticky: true, direction: 'top'});
+  polys.push([p, s]);
+  bounds = bounds ? bounds.extend(p.getBounds()) : p.getBounds();
+  s._poly = p;
+  s._lbl = L.marker(s.center, {interactive: false, icon: L.divIcon({className: '', html: '<div class="lbl">' + esc(s.name) + '</div>', iconSize: [0, 0]})}).addTo(labelLayer);
+}
+const _fit = () => { map.invalidateSize(); map.fitBounds(bounds.pad(0.02)); };
+if (document.getElementById('map').clientWidth) _fit();
+else { const _ro = new ResizeObserver(() => { if (document.getElementById('map').clientWidth) { _ro.disconnect(); _fit(); } });
+  _ro.observe(document.getElementById('map')); }
+const baseW = () => { const z = map.getZoom(); return z >= 14 ? 2 : z >= 12 ? 1 : 0.5; };
+const panelOpen = () => !document.getElementById('panel').hidden;
+const pad = () => ({paddingTopLeft: L.point(20, 80), paddingBottomRight: L.point(panelOpen() && innerWidth > 700 ? 410 : 20, 20)});
+
+function syncLayers(){
+  const z = map.getZoom();
+  z >= 15 ? map.addLayer(labelLayer) : map.removeLayer(labelLayer);
+  // group outlines only on the whole map: filtered, they are outlines of areas nobody asked to see
+  const zones = !filtering() && DROP < 0 && !SEL;
+  zones && z >= 12 && z < 15 ? map.addLayer(zoneLabels) : map.removeLayer(zoneLabels);
+  zones && z < 14 ? map.addLayer(zoneLayer) : map.removeLayer(zoneLayer);
+  zoneLayer.eachLayer(l => l.setStyle({weight: z >= 12 ? 3 : z >= 10 ? 2 : 1}));
+}
+map.on('zoomend', () => { syncLayers(); render(); });
+
+// ---------------------------------------------------------------- key
+const keybox = document.getElementById('keybox'), keybtn = document.getElementById('keybtn');
+function drawKey(){
+  let h;
+  const sw = c => '<span class="sw" style="background:' + c + '"></span>';
+  if (MODE === 'sector') h = '<b>Area colors</b><br>Each area its own color';
+  else if (MODE === 'ready') h = '<b>Doors ready to work</b><br>' + [[1,'Most of it'],[.5,'Half'],[0,'Hardly any']].map(([v,l]) => sw(ramp(v)) + l).join('<br>') + DASHED;
+  else if (MODE === 'rest') h = '<b>Days since knocked</b><br>' + REST.map(x => sw(x[1]) + x[2]).join('<br>') + '<br>' + sw(FRESH) + 'Never knocked' + DASHED;
+  else if (MODE === 'wave') { const ks = [...new Set(DATA.map(waveKey).filter(k => k != null))].sort((a,b)=>a-b);
+    h = '<b>Last worked</b><br>' + ks.map(k => sw(MONTHS[k%12]) + waveLabel(k)).join('<br>') + '<br>' + sw(FRESH) + 'Never knocked' + DASHED; }
+  else { const t = {worked: 'How much is knocked', contact: 'Answered the door (60% is green)', pen: 'Sold rate (15% is green)'}[MODE];
+    h = '<b>' + t + '</b><br>' + [[1,'High'],[.5,'Middle'],[0,'Low']].map(([v,l]) => sw(ramp(v)) + l).join('<br>') + '<br>' + sw('#bbb') + 'No knocks'; }
+  keybox.innerHTML = h;
+  const cols = MODE === 'rest' ? [FRESH, REST[0][1], REST[2][1], REST[4][1]] : MODE === 'wave' ? MONTHS.slice(0, 4) : [ramp(1), ramp(.66), ramp(.33), ramp(0)];
+  document.getElementById('keysw').innerHTML = cols.map(c => '<i style="background:' + c + '"></i>').join('');
+}
+let keyOpen = false;
+try { keyOpen = localStorage.getItem('growMapKey') === '1'; } catch (e) {}
+function setKey(o){ keyOpen = o; keybox.hidden = !o; keybtn.setAttribute('aria-expanded', o); try { localStorage.setItem('growMapKey', o ? '1' : '0'); } catch (e) {} }
+keybtn.onclick = () => setKey(!keyOpen);
+setKey(keyOpen);
+
+// ---------------------------------------------------------------- drawing
+function render(){
+  const bare = document.getElementById('outline').checked;
+  let shown = 0;
+  for (const [p, s] of polys){
+    const on = passes(s);
+    // filtered out means gone: no fill, no outline, no label, nothing to click
+    if (!on){ polyLayer.removeLayer(p); labelLayer.removeLayer(s._lbl); continue; }
+    shown++;
+    if (!polyLayer.hasLayer(p)) polyLayer.addLayer(p);
+    if (!labelLayer.hasLayer(s._lbl)) labelLayer.addLayer(s._lbl);
+    // an area someone knocked in the last 2 weeks gets a dashed edge, so a part worked
+    // area can never read as untouched just because its middle door is old
+    const busy = s.hot > 0 && (MODE === 'rest' || MODE === 'ready' || MODE === 'wave');
+    const nosec = /\(no sector\)/.test(s.name);
+    p.setStyle({fillColor: fill(s, MODE), color: bare ? fill(s, MODE) : nosec ? '#666' : busy ? '#111' : '#222',
+                dashArray: nosec ? '5 5' : busy && !bare ? '5,4' : null,
+                fillOpacity: bare ? 0 : MODE === 'sector' ? 0.35 : 0.5,
+                weight: bare ? 2.5 : busy ? 2.5 : baseW(), opacity: 0.9});
+    if (DROP >= 0){
+      const k = inDrop(s, DROP);
+      if (k) p.setStyle({color: NEWC, weight: k === 'new' ? 4 : 3, dashArray: k === 'grew' ? '6,4' : null, opacity: 1, fillOpacity: 0.5});
+      else p.setStyle({opacity: 0.25, fillOpacity: 0.05, weight: baseW()});
+    }
+    // the picked area stands alone: everything else drops back to a faint wash
+    if (SEL && s !== SEL) p.setStyle({opacity: 0.22, fillOpacity: 0.07, weight: 0.5});
+    if (SEL && s === SEL) p.setStyle({opacity: 0, fillOpacity: 0});
+  }
+  syncLayers();
+  drawKey();
+  lift();
+  const n = (FILT !== '0') + !!REP + document.getElementById('outline').checked;
+  const fc = document.getElementById('fcount');
+  fc.hidden = !n; fc.textContent = n;
+  document.getElementById('fbtn').classList.toggle('on', filtering());
+  document.getElementById('meta').textContent = shown + ' of ' + DATA.length + ' areas · updated ' + META.built;
+  document.querySelectorAll('#modes button').forEach(b => b.classList.toggle('on', b.dataset.m === MODE));
+  document.querySelectorAll('#filts button').forEach(b => b.classList.toggle('on', b.dataset.f === FILT));
+  document.getElementById('more').value = ['sector', 'worked', 'contact'].includes(MODE) ? MODE : '';
+}
+
+// The picked area is lifted off the map: redrawn in a pane above the rest with a white
+// casing under a dark edge, the way a card sits above a page.
+map.createPane('pick');
+map.getPane('pick').style.zIndex = 450;
+// it sits over the areas, so it must not take their clicks
+map.getPane('pick').style.pointerEvents = 'none';
+const pickCanvas = L.canvas({pane: 'pick'});
+let lifted = [];
+function lift(){
+  for (const l of lifted) map.removeLayer(l);
+  lifted = [];
+  if (!SEL) return;
+  const shape = SEL._poly.getLatLngs();
+  lifted.push(L.polygon(shape, {pane: 'pick', renderer: pickCanvas, color: '#fff', weight: 11, opacity: 0.95, fill: false, interactive: false}).addTo(map));
+  lifted.push(L.polygon(shape, {pane: 'pick', renderer: pickCanvas, color: '#111', weight: 3.5, opacity: 1,
+                                fillColor: fill(SEL, MODE), fillOpacity: 0.3, interactive: false}).addTo(map));
+}
+
+// Every house in the picked area, coloured by how long since it was knocked, so the
+// worked streets and the untouched ones show inside one area.
+const doorLayer = L.layerGroup();
+let showDoors = true;
+try { showDoors = localStorage.getItem('growMapDoors') !== '0'; } catch (e) {}
+function inRing(lat, lon, ring){
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++){
+    const yi = ring[i][0], xi = ring[i][1], yj = ring[j][0], xj = ring[j][1];
+    if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function drawDoors(){
+  doorLayer.clearLayers();
+  if (!SEL || !showDoors){ map.removeLayer(doorLayer); return; }
+  const rings = (SEL.poly || []).map(p => p[0]).filter(r => r && r.length > 2);
+  const b = SEL._poly.getBounds();
+  for (const [lat, lon, rest, si] of PTS){
+    if (!b.contains([lat, lon]) || !rings.some(r => inRing(lat, lon, r))) continue;
+    L.circleMarker([lat, lon], {radius: 5, weight: 1, color: '#fff', opacity: 0.85, fillOpacity: 0.95, fillColor: restColor(rest)})
+      .bindTooltip((rest < 0 ? 'Never knocked' : rest + ' days since knocked') + (si >= 0 ? '<br>' + esc(META.stages[si]) : ''))
+      .addTo(doorLayer);
+  }
+  map.addLayer(doorLayer);
+}
+
+// ---------------------------------------------------------------- the panel
+const panel = document.getElementById('panel'), pbody = document.getElementById('pbody');
+function spark(weeks){
+  const max = Math.max(1, ...weeks), w = 13, h = 40;
+  let bars = '';
+  weeks.forEach((v, i) => { const bh = v ? Math.max(2, h * v / max) : 0;
+    bars += '<rect x="' + i*w + '" y="' + (h-bh) + '" width="' + (w-3) + '" height="' + bh + '" fill="#3b6fd8" rx="1"><title>' + v + ' doors</title></rect>'; });
+  return '<svg width="100%" viewBox="0 0 ' + weeks.length*w + ' ' + h + '" preserveAspectRatio="none" style="display:block;height:' + h + 'px">' + bars +
+    '<line x1="0" y1="' + h + '" x2="' + weeks.length*w + '" y2="' + h + '" stroke="#ccd"/></svg>';
+}
+function areaCard(s){
+  const stat = (v, l) => '<div class="stat"><b>' + v + '</b><span>' + l + '</span></div>';
+  const tags = [];
+  if (DROPS.length){
+    const di = DROP >= 0 ? DROP : 0, k = inDrop(s, di);
+    if (k === 'new') tags.push('New area from the ' + dayLbl(DROPS[di].date) + ' drop');
+    else if (k) tags.push('+' + s.adds[di] + ' doors from the ' + dayLbl(DROPS[di].date) + ' drop');
+  }
+  const last = s.wave ? 'Last worked <b>' + s.wave.from + (s.wave.from !== s.wave.to ? ' to ' + s.wave.to : '') + '</b>, ' +
+    s.wave.age + ' days ago' + (s.last && s.last !== s.wave.to ? '. Latest single knock ' + s.last : '') : 'Nobody has knocked this area yet';
+  const reps = s.reps.length ? '<details' + (s.reps.length <= 6 ? ' open' : '') + '><summary>Who knocked it (' + s.reps.length + ')</summary><table>' +
+    '<tr><th>Rep</th><th>Doors</th><th>Last</th><th>Answered</th><th>Sold</th></tr>' +
+    s.reps.map(r => '<tr' + (r[0] === REP ? ' class="me"' : '') + '><td>' + esc(r[0]) + '</td><td>' + r[1] + '</td><td>' + r[2] + '</td><td>' + r[3] + '</td><td>' + r[4] + '</td></tr>').join('') +
+    '</table></details>' : '';
+  const recent = s.recent.length ? '<details><summary>Times worked (' + s.passes + ')</summary><table>' +
+    s.recent.map(p => '<tr><td>' + p[0] + (p[0] !== p[1] ? ' to ' + p[1] : '') + '<div class="who">' + esc((p[3] || []).join(', ')) + '</div></td><td>' + p[2] + ' doors</td></tr>').join('') + '</table></details>' : '';
+  const st = '<details><summary>Where each door stands</summary><table>' +
+    Object.entries(s.statuses).map(([k, v]) => '<tr><td>' + esc(k) + '</td><td>' + v + '</td></tr>').join('') + '</table></details>';
+  const corners = s.poly.map((poly, i) => (s.poly.length > 1 ? 'Piece ' + (i + 1) + '\n' : '') +
+    poly[0].map(p => p[0].toFixed(6) + ', ' + p[1].toFixed(6)).join('\n')).join('\n');
+  const nCorner = s.poly.reduce((t, poly) => t + poly[0].length, 0);
+  const draw = '<details><summary>Corner points (' + nCorner + ')</summary><button class="small copy" data-c="' + encodeURIComponent(corners) + '" style="margin-top:6px">Copy all</button><pre>' + corners + '</pre></details>';
+  return tags.map(t => '<div class="tag">' + t + '</div>').join('') +
+    '<div class="stats">' + stat(s.ready, 'Ready to work (' + pct(s.ready, s.total) + ')') + stat(rough(isFresh(s) ? null : s.rest), 'Rested, middle door') +
+    stat(s.never, 'Never knocked of ' + s.total) + stat(s.sold + ' <small style="font-size:12px;color:#6b7178">' + pct(s.sold, s.total) + '</small>', 'Sold') + '</div>' +
+    '<div class="line">' + last + '</div>' +
+    '<div class="line">Answered the door: ' + s.contacts + (s.worked ? ' (' + pct(s.contacts, s.worked) + ' of knocked)' : '') + ' · ' + s.lately + ' knocked in the last 4 weeks</div>' +
+    '<label class="ck" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="pdoors"' + (showDoors ? ' checked' : '') + '> Show every house in this area</label>' +
+    '<div><div class="cap">Doors knocked each week</div>' + spark(s.weeks) + '</div>' + reps + recent + st + draw;
+}
+function dropList(){
+  const d = DROPS[DROP];
+  const rows = DATA.filter(s => inDrop(s, DROP) && passes(s)).sort((a, b) =>
+    ((b.born === DROP) - (a.born === DROP)) || ((b.adds[DROP] || 0) - (a.adds[DROP] || 0)) || b.total - a.total);
+  return '<div class="line">' + d.doors.toLocaleString() + ' doors' + (d.files.length ? ' from ' + esc(d.files.join(', ')) : '') + '</div>' +
+    '<div class="dl">' + rows.map(s => '<button data-n="' + esc(s.name) + '"><span class="sw" style="background:' + fill(s, 'rest') + '"></span><span class="nm">' + esc(s.name) +
+    '</span><span class="v">' + s.total + ' doors</span><span class="nw">' + (s.born === DROP ? 'NEW' : '+' + s.adds[DROP]) + '</span></button>').join('') + '</div>';
+}
+function paintPanel(){
+  if (SEL){
+    document.getElementById('ptitle').textContent = SEL.name;
+    document.getElementById('psub').textContent = [SEL.cities, (SEL.streets || []).join(', ')].filter(Boolean).join(' · ');
+    pbody.innerHTML = areaCard(SEL);
+    panel.hidden = false;
+  } else if (DROP >= 0){
+    document.getElementById('ptitle').textContent = 'New ' + dayLbl(DROPS[DROP].date);
+    document.getElementById('psub').textContent = ago(DROPS[DROP].date);
+    pbody.innerHTML = dropList();
+    panel.hidden = false;
+  } else panel.hidden = true;
+  pbody.scrollTop = 0;
+}
+pbody.addEventListener('click', e => {
+  const b = e.target.closest('button.copy');
+  if (b){ navigator.clipboard.writeText(decodeURIComponent(b.dataset.c)); b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy all', 1500); return; }
+  const r = e.target.closest('.dl button');
+  if (r) go(DATA.find(x => x.name === r.dataset.n));
+});
+pbody.addEventListener('change', e => {
+  if (e.target.id !== 'pdoors') return;
+  showDoors = e.target.checked;
+  try { localStorage.setItem('growMapDoors', showDoors ? '1' : '0'); } catch (err) {}
+  drawDoors();
+});
+const tell = msg => { if (window.parent !== window) try { parent.postMessage(Object.assign({isp: META.isp}, msg), '*'); } catch (e) {} };
+function select(s){
+  SEL = s;
+  polys.forEach(([p]) => p.closeTooltip());
+  render(); drawDoors(); paintPanel();
+  tell({type: 'growOpen', name: s.name});
+}
+function unselect(quiet){
+  if (!SEL) return;
+  SEL = null;
+  render(); drawDoors(); paintPanel();
+  if (!quiet) tell({type: 'growCleared'});
+}
+function go(s){
+  if (!s) return;
+  if (!passes(s)){ FILT = '0'; REP = ''; document.getElementById('rep').value = ''; }
+  select(s);
+  map.fitBounds(s._poly.getBounds(), Object.assign({maxZoom: 16}, pad()));
+}
+document.getElementById('pclose').onclick = () => { if (SEL) unselect(); else if (DROP >= 0) showDrop(-1); };
+// A click on a shape fires on the shape AND on the map under it, so the map's own
+// click (which clears the pick) has to ignore the one that just made it.
+let picked = 0;
+for (const [p, s] of polys) p.on('click', e => { picked = Date.now(); L.DomEvent.stopPropagation(e); select(s); });
+map.on('click', () => { if (SEL && Date.now() - picked > 150) unselect(); });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!document.getElementById('fpanel').hidden) return toggleFilters(false);
+  if (SEL) unselect(); else if (DROP >= 0) showDrop(-1);
+});
+
+// ---------------------------------------------------------------- controls
+document.querySelectorAll('#modes button').forEach(b => b.onclick = () => { MODE = b.dataset.m; render(); });
+document.getElementById('more').onchange = e => { if (e.target.value){ MODE = e.target.value; render(); } };
+document.querySelectorAll('#filts button').forEach(b => b.onclick = () => {
+  FILT = b.dataset.f;
+  if (SEL && !passes(SEL)) unselect();
+  render(); if (DROP >= 0) paintPanel();
+});
+const fpanel = document.getElementById('fpanel'), fbtn = document.getElementById('fbtn');
+function toggleFilters(o){ fpanel.hidden = !o; fbtn.setAttribute('aria-expanded', o); }
+fbtn.onclick = e => { e.stopPropagation(); toggleFilters(fpanel.hidden); };
+document.addEventListener('click', e => { if (!fpanel.hidden && !e.target.closest('.wrap')) toggleFilters(false); });
+L.DomEvent.disableClickPropagation(document.querySelector('.bar'));
+L.DomEvent.disableScrollPropagation(document.querySelector('.bar'));
+L.DomEvent.disableClickPropagation(panel);
+L.DomEvent.disableScrollPropagation(panel);
+L.DomEvent.disableClickPropagation(document.querySelector('.key'));
+document.getElementById('freset').onclick = () => {
+  FILT = '0'; REP = ''; document.getElementById('rep').value = ''; document.getElementById('outline').checked = false; render();
+};
+const repSel = document.getElementById('rep');
+const repDoors = {};
+DATA.forEach(s => s.reps.forEach(r => repDoors[r[0]] = (repDoors[r[0]] || 0) + r[1]));
+Object.keys(repDoors).sort().forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = k + ' (' + repDoors[k] + ')'; repSel.appendChild(o); });
+function setRep(r){
+  REP = r; repSel.value = r;
+  if (SEL && !passes(SEL)) unselect();
+  render();
+  const vis = polys.filter(([, s]) => passes(s));
+  if (r && vis.length) map.fitBounds(L.featureGroup(vis.map(([p]) => p)).getBounds(), Object.assign({maxZoom: 15}, pad()));
+}
+repSel.onchange = () => setRep(repSel.value);
+document.getElementById('outline').onchange = render;
+document.getElementById('pts').onchange = e => {
+  if (e.target.checked){
+    if (!ptsLayer.getLayers().length)
+      for (const [lat, lon, r, si, di] of PTS)
+        ptsLayer.addLayer(L.circleMarker([lat, lon], {radius: 3, weight: 0, fillOpacity: .9, fillColor: restColor(r)})
+          .bindTooltip((r < 0 ? 'Never knocked' : r + ' days rested') + (si >= 0 ? '<br>' + esc(META.stages[si]) : '') +
+                       (di >= 0 ? '<br>Dropped ' + dayLbl(DROPS[di].date) : '')));
+    map.addLayer(ptsLayer);
+  } else map.removeLayer(ptsLayer);
+};
+
+// search: an area by name, a street (lands on the area it runs through), or a rep
+const qlist = document.getElementById('qlist'), q = document.getElementById('q');
+const opts = [], seen = new Set();
+DATA.slice().sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true})).forEach(s => opts.push(s.name));
+DATA.forEach(s => (s.streets || []).forEach(st => { const k = st + ' · ' + s.name; if (!seen.has(k)){ seen.add(k); opts.push(k); } }));
+Object.keys(repDoors).sort().forEach(r => opts.push('Rep: ' + r));
+qlist.innerHTML = opts.map(o => '<option value="' + esc(o) + '"></option>').join('');
+function find(v){
+  v = v.trim();
+  if (!v) return;
+  if (v.startsWith('Rep: ')){ const r = v.slice(5); if (repDoors[r] != null){ setRep(r); q.value = ''; q.blur(); } return; }
+  const name = v.includes(' · ') ? v.split(' · ').pop() : v;
+  const lo = name.toLowerCase();
+  const s = DATA.find(x => x.name === name) || DATA.find(x => x.name.toLowerCase() === lo) ||
+            DATA.find(x => x.name.toLowerCase().startsWith(lo)) ||
+            DATA.find(x => (x.streets || []).some(st => st.toLowerCase().includes(lo)));
+  if (s){ go(s); q.value = ''; q.blur(); }
+}
+q.addEventListener('change', () => find(q.value));
+q.addEventListener('keydown', e => { if (e.key === 'Enter') find(q.value); });
+
+// What's new: the areas a lead drop drew, and the old areas it put doors into, lit up
+// in one colour over a faded map so the next place to send people is obvious.
+const dropSel = document.getElementById('drop'), newsGo = document.getElementById('newsGo');
+const newsLayer = L.layerGroup().addTo(map), newsPts = L.layerGroup();
+function newsText(){
+  const d = DROPS[+dropSel.value || 0], add = d.grew.reduce((t, g) => t + g[1], 0);
+  const parts = [];
+  if (d.new.length) parts.push(d.new.length + ' new');
+  if (d.grew.length) parts.push('+' + add + ' doors');
+  newsGo.textContent = (DROP >= 0 ? 'Showing ' : 'New ') + dayLbl(d.date) + ' · ' + parts.join(', ');
+  newsGo.classList.toggle('on', DROP >= 0);
+  newsGo.title = d.doors.toLocaleString() + ' doors' + (d.files.length ? ' from ' + d.files.join(', ') : '');
+}
+function showDrop(i){
+  DROP = i;
+  if (SEL) SEL = null;
+  newsLayer.clearLayers(); newsPts.clearLayers(); map.removeLayer(newsPts);
+  newsText(); render(); drawDoors(); paintPanel();
+  if (i < 0) return;
+  let b = null;
+  for (const [p, s] of polys){
+    const k = inDrop(s, i);
+    if (!k || !passes(s)) continue;
+    b = b ? b.extend(p.getBounds()) : L.latLngBounds(p.getBounds().getSouthWest(), p.getBounds().getNorthEast());
+    L.marker(s.center, {interactive: false, icon: L.divIcon({className: '', iconSize: [0, 0],
+      html: '<div class="nlbl' + (k === 'grew' ? ' grew' : '') + '">' + (k === 'new' ? 'NEW' : '+' + s.adds[i]) + '</div>'})}).addTo(newsLayer);
+  }
+  // the dropped doors themselves, so a handful scattered into an old area still shows
+  for (const q of PTS) if (q[4] === i)
+    L.circleMarker([q[0], q[1]], {radius: 3, weight: 1, color: '#fff', fillColor: NEWC, fillOpacity: 1, interactive: false}).addTo(newsPts);
+  map.addLayer(newsPts);
+  if (b) map.fitBounds(b, Object.assign({maxZoom: 15}, pad()));
+}
+if (DROPS.length){
+  DROPS.forEach((d, i) => { const o = document.createElement('option'); o.value = i;
+    o.textContent = dayLbl(d.date); o.title = ago(d.date); dropSel.appendChild(o); });
+  newsGo.hidden = false;
+  if (DROPS.length > 1) dropSel.hidden = false;
+  newsGo.onclick = () => showDrop(DROP >= 0 ? -1 : +dropSel.value);
+  dropSel.onchange = () => showDrop(+dropSel.value);
+  newsText();
+}
+
+// the page this sits in (More > ISP Maps) can pick an area from its own list
+addEventListener('message', e => {
+  const d = e.data || {};
+  if (d.type === 'growGo' && d.name) go(DATA.find(x => x.name === d.name));
+  if (d.type === 'growClear') unselect(true);
+});
+for (const [p, s] of polys) if (/\(no sector\)/.test(s.name)) p.setStyle({dashArray: '5 5', color: '#666'});
+render();
+
+const _rows = DATA.map(s => ({name: s.name, city: s.city, zone: s.zone, total: s.total, never: s.never,
+  worked: s.worked, rest30: s.rest30, rest90: s.rest90, rest: s.rest, contacts: s.contacts, sold: s.sold,
+  // the group hit, not the single freshest knock: one door touched yesterday does not
+  // make an area worked. lastN is its ordinal, so the list can sort what it shows.
+  last: s.wave ? s.wave.to : '', lastN: s.wave ? s.wave.mid : 0, age: s.wave ? s.wave.age : null,
+  from: s.wave ? s.wave.from : '', share: s.wave ? s.wave.share : null,
+  passes: s.passes, first: s.first, streets: s.streets || [],
+  // the freshest single knock, and how many doors were knocked in the last 4 weeks.
+  // Without these, an area where a rep knocked ten doors yesterday still reads as
+  // months old, because "days since knocked" is the middle door of the whole area.
+  fresh: s.last, lately: (s.weeks || []).slice(-4).reduce((a, b) => a + b, 0),
+  weeks: s.weeks || [], recent: s.recent || [], statuses: s.statuses || {}, poly: s.poly || [],
+  reps: (s.reps || []).slice().sort((a, b) => b[1] - a[1])}));
+if (window.parent !== window)
+  try { parent.postMessage({type: 'growSectors', isp: META.isp, rows: _rows,
+                            palette: {fresh: FRESH, rest: REST},
+                            meta: {doors: META.doors, built: META.built, week0: META.week0}}, '*'); } catch (e) {}
+</script>
+</body></html>

@@ -1,0 +1,26 @@
+# Secrets: values live in the password manager, never here
+.env
+.env.*
+!.env.example
+*.key
+**/data/sr-auth*.json
+**/data/*-lead-endpoint.json
+**/data/.sector-map-key
+**/data/.sequifi-token
+
+# Login sessions held by Chrome profiles
+.*-profile/
+.*-profile-*/
+.grow-*-profile/
+
+# Machine-local
+node_modules/
+.DS_Store
+__pycache__/
+.vercel/
+.claude/settings.local.json
+.claude/worktrees/
+*.bak*
+
+# Research notes used to build the handoff (contain machine paths, not secrets)
+handoff/_*

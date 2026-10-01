@@ -1,0 +1,103 @@
+{
+  "_readme": [
+    "One entry per ISP we sell for that reports through Opendoor's RTR portal.",
+    "The key is the SOURCE TAG written onto every knocking row, so it must stay stable \u2014 renaming a key orphans that ISP's history.",
+    "",
+    "reportPath  the folder + report inside the portal. Open the report in Chrome and copy the value of ?Path= from the URL.",
+    "supervisor  must match the Supervisor dropdown EXACTLY. Omit or null if that ISP's report has no Supervisor parameter \u2014 then every row it returns is taken.",
+    "profile     optional. Omit to share .rtr-profile (one Opendoor login covering every ISP folder). Set it only if an ISP needs a separate login.",
+    "dropdowns   optional. For reports scoped by cascading dropdowns instead of a Supervisor.",
+    "            Each entry is {ctl, name, value} and they are applied IN ORDER, since each",
+    "            posts back and populates the next. ctl is the ReportViewer control id.",
+    "cadence     optional, 'daily'. Omitted means every tick of the 30-min agent. A daily",
+    "            source runs on the first tick of the day and is skipped the rest of the day.",
+    "columns     optional. Exact CSV header names, for ISPs whose report is built differently. Anything omitted is guessed.",
+    "",
+    "ADDING AN ISP: add reportPath + supervisor, run `node scripts/rtr-sync.mjs --source <key> --dry`.",
+    "If the guesser can't find a column it prints the real header row and exits \u2014 paste those names into a columns block and re-run.",
+    "",
+    "Mirrors data/amplify-sources.json: untracked, lives beside it, same idea."
+  ],
+  "ezee": {
+    "label": "EZEE Fiber",
+    "reportPath": "/Ezee Fiber/Time_Track_Highlight",
+    "supervisor": "Robert Sentipal",
+    "_note": "Column names confirmed 2026-08-05; listed explicitly so a report redesign fails loudly instead of silently matching a subtotal column.",
+    "columns": {
+      "rep": "D2D_Rep",
+      "date": "RecordDate1",
+      "doors": "AllAttempts",
+      "uniq": "UniqueDispositions",
+      "contacts": "Contact",
+      "sold": "Sales1",
+      "first": "StartTime1",
+      "last": "EndTime1"
+    },
+    "market": {
+      "_note": "Highlight has no team column; plain Time_Track has BU_Level_3 and matched Highlight doors/contacts/sold exactly on 2026-09-30 (its times skip distant knocks, so it only tags market). Rendered in the same run. Matched on the city the team name starts with (\"Houston Contractor Team 5\" -> Houston); only rep-days already ours get tagged, so this cannot pull in another company. A team in a city not listed lands null and the sync log says WARNING no market.",
+      "reportPath": "/Ezee Fiber/Time_Track",
+      "column": "BU_Level_3",
+      "cities": {
+        "Houston": "Houston",
+        "Chicago": "Chicago",
+        "Detroit": "Michigan",
+        "Albuquerque": "Albuquerque"
+      }
+    }
+  },
+  "bluepeak": {
+    "label": "Bluepeak",
+    "reportPath": "/VastBroadband/Time_Track",
+    "query": "UserID=84046&ReportByTypeID=3",
+    "supervisor": null,
+    "scope": {
+      "column": "BU_Level_3",
+      "value": "Grow Marketing"
+    },
+    "_note": "Folder is still the pre-rebrand name VastBroadband. No Supervisor parameter on this report: it is scoped by the UserID/ReportByTypeID query params instead, and WITHOUT them it returns every business unit on the platform (verified 2026-08-18 \u2014 CSG rows came back). scope re-checks that in the CSV so a silently ignored param cannot widen the import. No raw contacts column either; it is derived from the full-precision rate in Textbox32 times ValidAttempts.",
+    "columns": {
+      "rep": "D2DRep1",
+      "date": "RecordDate1",
+      "doors": "AllAttempts",
+      "uniq": "UniqueDispositions",
+      "sold": "Sales",
+      "first": "StartTime",
+      "last": "EndTime",
+      "contactsPct": "Textbox32",
+      "contactsBase": "ValidAttempts"
+    }
+  },
+  "omni": {
+    "label": "Omni Fiber",
+    "reportPath": "/Omni Fiber/Time_Track",
+    "supervisor": null,
+    "cadence": "daily",
+    "_note": "Scoped by two CASCADING dropdowns, not a Supervisor: Company must be set first because Region is empty until it posts back. Region left on 'All' returns every business unit on the platform (34 of them, incl. Omni's own internal teams and rival vendors like Embrase) \u2014 same trap as bluepeak, so scope re-checks it in the CSV. Data floor is 5/11/2026; our own activity is 6/18-8/7/2026. Columns confirmed 2026-08-21.",
+    "dropdowns": [
+      {
+        "ctl": "ctl07",
+        "name": "Company",
+        "value": "All"
+      },
+      {
+        "ctl": "ctl09",
+        "name": "Region",
+        "value": "Grow Marketing"
+      }
+    ],
+    "scope": {
+      "column": "BU_Level_3",
+      "value": "Grow Marketing"
+    },
+    "columns": {
+      "rep": "D2DRep",
+      "date": "RecordDate1",
+      "doors": "AllAttempts",
+      "uniq": "UniqueDispositions",
+      "contacts": "UniqueContactMade",
+      "sold": "UniqueSales",
+      "first": "StartTime",
+      "last": "EndTime"
+    }
+  }
+}

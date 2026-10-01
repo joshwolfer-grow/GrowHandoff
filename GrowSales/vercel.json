@@ -1,0 +1,109 @@
+{
+  "buildCommand": "bash build.sh",
+  "outputDirectory": "public",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/$1"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/index.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/team-assignments.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/team-current.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/scripts/(.*)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/plain; charset=utf-8"
+        }
+      ]
+    }
+  ],
+  "functions": {
+    "api/bria-sync.js": {
+      "maxDuration": 60
+    },
+    "api/sequifi-sync.js": {
+      "maxDuration": 60
+    },
+    "api/weekly-rep-email.js": {
+      "maxDuration": 60
+    },
+    "api/sheet-sync.js": {
+      "maxDuration": 60
+    },
+    "api/sequifi-teams-sync.js": {
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/weekly-summary",
+      "schedule": "0 14 * * 1"
+    },
+    {
+      "path": "/api/bria-sync",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/sequifi-sync",
+      "schedule": "30 8 * * *"
+    },
+    {
+      "path": "/api/sequifi-teams-sync",
+      "schedule": "45 8 * * *"
+    },
+    {
+      "path": "/api/sync-watchdog",
+      "schedule": "0 10 * * *"
+    }
+  ]
+}

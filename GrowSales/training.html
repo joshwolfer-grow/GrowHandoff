@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Grow Smokescreens and Objections</title>
+<meta name="description" content="Smokescreen and objection handling flashcards.">
+<!-- Public flashcard page. The app sits behind access codes now, so the old
+     ?training=<slug> share link lands on the sign-in screen. This page reads
+     training_cards with the anon key and shows only the Smokescreens and
+     Objections decks. ?c=<slug> opens one deck first. Cards are still edited
+     in the app under More > Training. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f2f2ec;--card:#fff;--ink:#0b0c0b;--ink3:#48484a;--ink4:#86868b;
+  --line:rgba(60,60,67,0.12);--green:#178f3f;--lime:#34c759;--tint:#e6f4ea;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+.hd{background:#000;color:#fff;padding:22px 18px 20px;}
+.hd-in,.wrap{max-width:460px;margin:0 auto;}
+.logo{height:26px;display:block;}
+.kick{color:var(--lime);font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;margin-top:20px;}
+.title{font-family:'Archivo Black',Impact,sans-serif;font-size:27px;line-height:1.02;text-transform:uppercase;margin-top:4px;}
+.seg{display:flex;background:#1c1c1e;border-radius:10px;padding:3px;margin-top:14px;}
+.seg button{flex:1;border:0;background:none;color:#b9bcb8;font-weight:600;font-size:14px;font-family:inherit;padding:8px;border-radius:8px;cursor:pointer;}
+.seg button.on{background:#fff;color:#000;}
+.wrap{padding:18px 14px 60px;}
+.meta{font-size:13px;color:var(--ink4);text-align:center;margin-bottom:12px;}
+.flip{perspective:900px;cursor:pointer;user-select:none;}
+.inner{display:grid;transition:transform .5s;transform-style:preserve-3d;}
+.flip.on .inner{transform:rotateY(180deg);}
+.face{grid-area:1/1;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:16px;
+  padding:30px 20px;min-height:240px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;font-size:17px;line-height:1.5;font-weight:600;border:1px solid var(--line);
+  box-shadow:0 2px 10px rgba(0,0,0,.06);word-break:break-word;white-space:pre-wrap;}
+.front{background:var(--card);}
+.back{background:var(--tint);color:#0f3d1e;transform:rotateY(180deg);font-weight:500;}
+.tag{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ink4);margin-bottom:10px;white-space:normal;}
+.back .tag{color:var(--green);}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;}
+.nav button{flex:1;padding:12px;border-radius:12px;border:1px solid var(--line);background:#fff;font-size:15px;font-weight:600;font-family:inherit;color:var(--ink);cursor:pointer;}
+.nav button:active{opacity:.7;}
+.count{min-width:64px;text-align:center;font-size:14px;color:var(--ink4);font-weight:600;}
+.msg{text-align:center;color:var(--ink4);padding:40px 10px;font-size:15px;}
+</style>
+</head>
+<body>
+<div class="hd"><div class="hd-in">
+  <img class="logo" src="/grow-wordmark.png" alt="Grow">
+  <div class="kick">Training</div>
+  <div class="title">Smokescreens<br>and Objections</div>
+  <div class="seg" id="seg"></div>
+</div></div>
+<div class="wrap" id="app"><div class="msg">Loading cards…</div></div>
+<script>
+(function(){
+  var SB='https://cmkfohwbejcztctrpdnt.supabase.co';
+  var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNta2ZvaHdiZWpjenRjdHJwZG50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNDYyODgsImV4cCI6MjA5NzgyMjI4OH0.waLa5E9a6SMvJ70keY9duAz4VxK39sDNNbmPSSbcebo';
+  var DECKS=['Smokescreens','Objections'];
+  var slug=function(s){return String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');};
+  var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+  var cards={},deck=DECKS[0],idx=0,flipped=false;
+  try{var want=new URLSearchParams(location.search).get('c');DECKS.forEach(function(d){if(want&&slug(d)===slug(want))deck=d;});}catch(e){}
+
+  function seg(){
+    document.getElementById('seg').innerHTML=DECKS.map(function(d){
+      return '<button class="'+(d===deck?'on':'')+'" data-d="'+esc(d)+'">'+esc(d)+' ('+(cards[d]||[]).length+')</button>';
+    }).join('');
+  }
+  function render(){
+    seg();
+    var list=cards[deck]||[],app=document.getElementById('app');
+    if(!list.length){app.innerHTML='<div class="msg">No cards yet.</div>';return;}
+    var c=list[idx];
+    app.innerHTML='<div class="meta">Tap the card to flip</div>'
+      +'<div class="flip'+(flipped?' on':'')+'" id="flip"><div class="inner">'
+      +'<div class="face front"><div class="tag">They say</div>'+esc(c.front)+'</div>'
+      +'<div class="face back"><div class="tag">You say</div>'+esc(c.back)+'</div>'
+      +'</div></div>'
+      +'<div class="nav"><button id="prev">Prev</button><span class="count">'+(idx+1)+' of '+list.length+'</span><button id="next">Next</button></div>';
+  }
+  function step(n){var len=(cards[deck]||[]).length;if(!len)return;idx=(idx+n+len)%len;flipped=false;render();}
+
+  document.addEventListener('click',function(e){
+    var b=e.target.closest('button');
+    if(b&&b.dataset.d){deck=b.dataset.d;idx=0;flipped=false;render();
+      try{var u=new URL(location.href);u.searchParams.set('c',slug(deck));history.replaceState({},'',u);}catch(_){}
+      return;}
+    if(b&&b.id==='prev')return step(-1);
+    if(b&&b.id==='next')return step(1);
+    var f=e.target.closest('#flip');
+    if(f){flipped=!flipped;f.classList.toggle('on',flipped);}
+  });
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowRight')step(1);else if(e.key==='ArrowLeft')step(-1);
+    else if(e.key===' '){e.preventDefault();var f=document.getElementById('flip');if(f){flipped=!flipped;f.classList.toggle('on',flipped);}}
+  });
+
+  var q='select=category,front,back,sort_order,created_at&category=in.('+DECKS.map(encodeURIComponent).join(',')+')&order=sort_order.asc,created_at.asc';
+  fetch(SB+'/rest/v1/training_cards?'+q,{headers:{apikey:KEY,Authorization:'Bearer '+KEY}})
+    .then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+    .then(function(rows){DECKS.forEach(function(d){cards[d]=[];});rows.forEach(function(r){if(cards[r.category])cards[r.category].push(r);});render();})
+    .catch(function(){document.getElementById('app').innerHTML='<div class="msg">Could not load the cards. Try again in a minute.</div>';});
+})();
+</script>
+</body>
+</html>

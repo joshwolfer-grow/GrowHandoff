@@ -1,0 +1,29 @@
+#!/bin/bash
+# office-wrap <agent> [--status-from-last-line] -- <command...>
+# Brackets a command with start/finish events. Exit code passes through.
+# With --status-from-last-line, the command's last stdout line becomes the status.
+[ $# -ge 1 ] || { echo "usage: office-wrap <agent> [--status-from-last-line] -- <cmd...>" >&2; exit 2; }
+LOG="$HOME/bin/office-log"
+AGENT="$1"; shift
+FROM_LAST=0
+if [ "$1" = "--status-from-last-line" ]; then FROM_LAST=1; shift; fi
+[ "$1" = "--" ] && shift
+RUN=$("$LOG" start "$AGENT")
+[ -n "$RUN" ] || RUN="local-$(date +%s)-$$"
+TMP=$(mktemp) || exit 1
+trap 'rm -f "$TMP"' EXIT
+trap '"$LOG" finish "$AGENT" --run "$RUN" --fail --status "killed"; rm -f "$TMP"; exit 143' INT TERM
+# Output goes to a file, not a pipe: a background watchdog left behind by the
+# command (sleep N; kill ...) would otherwise hold the pipe open and delay the finish.
+"$@" > "$TMP" 2>&1
+CODE=$?
+cat "$TMP"
+STATUS=""
+if [ $FROM_LAST -eq 1 ]; then
+  STATUS=$(grep -v '^[[:space:]]*$' "$TMP" | grep -vE 'Terminated: 15|Killed: 9' | tail -1)
+  STATUS=${STATUS:0:140}
+  case $STATUS in --*) STATUS=" $STATUS";; esac
+fi
+if [ "$CODE" -eq 0 ]; then "$LOG" finish "$AGENT" --run "$RUN" --ok --status "$STATUS"
+else "$LOG" finish "$AGENT" --run "$RUN" --fail --status "${STATUS:-exit $CODE}"; fi
+exit "$CODE"

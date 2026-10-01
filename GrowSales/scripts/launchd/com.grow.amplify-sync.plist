@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Intraday Amplify sync, every 5 minutes, all day. Companion to
+  com.grow.sr-sync — same cadence, same sleep behaviour (launchd coalesces
+  missed interval firings into one catch-up run on wake).
+
+  This is a headless Chrome run, not a bare HTTP pull like SalesRabbit, but a
+  measured run is 11s wall / 2.6s CPU against Amplify's own portal, so 5 minutes
+  is not a load anyone will notice. run-amplify-sync.sh holds a pid lock and
+  kills a run at 4 minutes, under the interval, so a hung Chrome costs one
+  skipped tick rather than wedging the schedule.
+
+  If you change this, change `every:` and `sched:` on the 'tds' row in
+  index.html (_growSyncStatus) too — the health board measures "runs missed"
+  against that number.
+
+  Kept as a SEPARATE agent rather than folded into the SalesRabbit runner so the
+  two fail independently: an expired SalesRabbit token must not stop Amplify
+  from syncing, and vice versa.
+
+  Install:
+    cp scripts/launchd/com.grow.amplify-sync.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.grow.amplify-sync.plist
+  Check:   launchctl list | grep amplify-sync
+  Remove:  launchctl unload ~/Library/LaunchAgents/com.grow.amplify-sync.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.grow.amplify-sync</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/joshuawolfer/Grow/GrowSales/scripts/run-amplify-sync.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>/Users/joshuawolfer/.nvm/versions/node/v20.20.2/bin:/usr/bin:/bin:/usr/local/bin</string></dict>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>2</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>22</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+  <key>StandardErrorPath</key>
+  <string>/Users/joshuawolfer/Grow/GrowSales/imports/done/amplify-sync-agent.err</string>
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

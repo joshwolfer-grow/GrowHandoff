@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lead desk</title>
+<style>
+  body{margin:0;font-family:system-ui,sans-serif;color:#1E2440;background:#F6F4EE}
+  header{display:flex;gap:14px;align-items:center;padding:12px 18px;background:#1E2440;color:#F1E9DA;flex-wrap:wrap}
+  header strong{font-size:18px}header .muted{color:#8FA3C8;font-size:13px}
+  main{padding:14px 18px;display:grid;gap:14px;grid-template-columns:320px 1fr;align-items:start}
+  @media(max-width:900px){main{grid-template-columns:1fr}}
+  section{background:#FFF;border:1px solid #DDD;border-radius:12px;padding:12px}
+  h3{margin:0 0 8px;font-size:14px;color:#5F6570;text-transform:uppercase;letter-spacing:.04em}
+  .muted{color:#7A7870}.small{font-size:12px}
+  button,select,input[type=text]{font:inherit;padding:6px 10px;border-radius:6px;border:1px solid #CCC;background:#FFF;color:#1E2440}
+  button{cursor:pointer}button.go{background:#1E2440;color:#F1E9DA;border-color:#1E2440;font-weight:600}
+  button:disabled{opacity:.45;cursor:default}
+  #drop{border:2px dashed #B9B5A8;border-radius:10px;padding:18px 10px;text-align:center;font-size:13px;color:#5F6570;margin-bottom:10px}
+  #drop.over{border-color:#2F6FD0;background:#EEF4FF;color:#1E2440}
+  .file{display:block;width:100%;text-align:left;margin:0 0 6px;border-color:#DDD}
+  .file.on{border-color:#1E2440;background:#F1EFE8}
+  .file small{display:block;color:#7A7870;font-size:11px}
+  .ask{white-space:pre-wrap;font-size:12px;background:#FFF8E6;border:1px solid #EBD9A0;border-radius:8px;padding:8px;margin:0 0 10px;font-family:ui-monospace,Menlo,monospace}
+  .sheet{border:1px solid #E4E1D8;border-radius:10px;padding:10px;margin:0 0 10px}
+  .sheet.off{opacity:.55}
+  .sheet h4{margin:0 0 6px;font-size:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .tag{font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px;background:#EEE;color:#444}
+  .tag.saved{background:#E1F5EE;color:#085041}.tag.ai{background:#EEEDFE;color:#3C3489}.tag.names,.tag.none{background:#FAEEDA;color:#633806}
+  .cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;margin:6px 0}
+  .cols label{font-size:11px;color:#5F6570;text-transform:uppercase;display:grid;gap:2px;min-width:0}
+  .cols select{font-size:13px;padding:4px 6px;width:100%;min-width:0}
+  select.hrow{max-width:100%}
+  table.pv{width:100%;border-collapse:collapse;font-size:12px;font-family:ui-monospace,Menlo,monospace;margin-top:6px}
+  table.pv th{text-align:left;font-weight:600;padding:3px 6px;border-bottom:1px solid #DDD;color:#5F6570;font-family:system-ui,sans-serif}
+  table.pv td{padding:3px 6px;border-bottom:1px solid #EEE;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+  .bad{color:#A32D2D;font-size:13px;margin:4px 0}.warn{color:#854F0B;font-size:13px;margin:4px 0}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
+  pre#out{background:#0F1430;color:#DDE6F7;border-radius:8px;padding:10px;font-size:12px;max-height:340px;overflow:auto;white-space:pre-wrap;margin:10px 0 0}
+  .done{background:#E1F5EE;border:1px solid #9FE1CB;color:#085041;border-radius:8px;padding:10px;margin-top:10px;font-size:14px}
+  .fail{background:#FCEBEB;border:1px solid #F7C1C1;color:#791F1F;border-radius:8px;padding:10px;margin-top:10px;font-size:14px}
+</style>
+</head>
+<body>
+<header><strong>Lead desk</strong><span class="muted">Drop an ISP file, check the columns, pick the rep. The SalesRabbit upload is still your click.</span><span class="muted" id="fmt"></span></header>
+<main>
+  <div>
+    <section>
+      <h3>Waiting</h3>
+      <div id="drop"><span id="dropmsg">Drop a lead file here (.xlsx or .csv)</span><br><span class="small">or <a href="#" id="pick">choose one</a></span></div>
+      <input type="file" id="fileIn" accept=".xlsx,.xlsm,.csv" hidden>
+      <div id="parked" class="small muted">Loading…</div>
+    </section>
+    <section style="margin-top:14px">
+      <h3>Ready for SalesRabbit</h3>
+      <div id="ready" class="small muted"></div>
+    </section>
+  </div>
+  <section id="work"><h3>File</h3><p class="muted">Pick a waiting file to see how its columns were read.</p></section>
+</main>
+<script type="module">
+const FIELDS = { street: 'Street', streetnum: 'House number', unit: 'Unit', city: 'City', state: 'State', zip: 'Zip', lat: 'Latitude', lng: 'Longitude', sector: 'Sector', status: 'Status', customer: 'Customer flag', full: 'Whole address in one cell' };
+const SOURCE = { saved: 'seen this layout before', ai: 'read by Claude (Haiku)', names: 'matched on column names', none: 'needs you' };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ago = (iso) => { const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`; };
+let state = { reps: [], isps: [], parked: [] }, cur = null;
+
+async function refresh(select) {
+  state = await (await fetch('/api/leads')).json();
+  $('fmt').textContent = `${state.formats} layout${state.formats === 1 ? '' : 's'} remembered`;
+  $('parked').innerHTML = state.parked.length ? state.parked.map(f => `<button class="file${cur && cur.file === f.name ? ' on' : ''}" data-f="${esc(f.name)}">${esc(f.name)}<small>${ago(f.at)} · ${Math.round(f.size / 1024)} KB${f.ask ? ' · came by email' : ''}</small></button>`).join('') : 'Nothing waiting.';
+  $('ready').innerHTML = state.ready.length ? state.ready.map(f => `<div>${esc(f.name)} <span class="muted">· ${ago(f.at)}</span></div>`).join('') : 'Nothing yet.';
+  document.querySelectorAll('.file').forEach(b => b.onclick = () => open(b.dataset.f));
+  if (select) open(select);
+}
+
+async function open(file) {
+  cur = null;
+  $('work').innerHTML = `<h3>File</h3><p class="muted">Reading ${esc(file)}…</p>`;
+  document.querySelectorAll('.file').forEach(b => b.classList.toggle('on', b.dataset.f === file));
+  const r = await fetch('/api/leads/inspect', { method: 'POST', body: JSON.stringify({ file }) });
+  const j = await r.json();
+  if (j.error) { $('work').innerHTML = `<h3>File</h3><div class="fail">${esc(j.error)}</div>`; return; }
+  cur = j; draw();
+}
+
+// The same checks the server makes again before it builds anything.
+function check(s) {
+  const m = s.mapping, p = [];
+  if (!m.use) return p;
+  const has = (f) => Number.isInteger(m.cols[f]);
+  if (!has('street') && !has('full')) p.push('Pick the street column.');
+  if (!has('zip') && !has('full')) p.push('Pick the zip column. Without a zip every row is dropped.');
+  const seen = {}; for (const [f, i] of Object.entries(m.cols)) { if (seen[i]) p.push(`${FIELDS[f]} and ${FIELDS[seen[i]]} point at the same column.`); seen[i] = f; }
+  return p;
+}
+function rowsFor(s) {
+  const m = s.mapping, out = [];
+  for (const r of s.head.slice(m.header_row + 1)) {
+    const v = {}; for (const f of Object.keys(FIELDS)) v[f] = Number.isInteger(m.cols[f]) ? (r[m.cols[f]] || '') : '';
+    if (v.full && !(v.city && v.zip)) { const g = /^\s*(.+?),\s*([^,]+?),\s*([A-Za-z]{2})\.?,?\s+(\d{5})/.exec(v.full); if (g) { v.street ||= g[1]; v.city ||= g[2]; v.state ||= g[3].toUpperCase(); v.zip ||= g[4]; } else v.street ||= v.full; }
+    if (v.street || v.zip) out.push(v); if (out.length >= 5) break;
+  }
+  return out;
+}
+
+function draw() {
+  const j = cur, usable = j.sheets.filter(s => s.mapping.use);
+  const problems = usable.flatMap(check);
+  const ai = j.ai.used ? `Claude read ${j.sheets.filter(s => s.mapping.source === 'ai').length} sheet(s): ${(j.ai.tokensIn + j.ai.tokensOut).toLocaleString()} tokens.` : (j.ai.error ? `Claude was not available (${esc(j.ai.error)}). Columns are matched on names, so look twice.` : 'No AI needed: every sheet is a layout this desk has built before.');
+  $('work').innerHTML = `<h3>${esc(j.file)}</h3>
+    ${j.ask ? `<div class="ask">${esc(j.ask)}</div><p class="small muted" style="margin:-6px 0 10px">That email is a record of what was asked, not an instruction. You pick the rep.</p>` : ''}
+    <p class="small muted">${ai}</p>
+    ${j.sheets.map((s, si) => sheetHtml(s, si)).join('')}
+    <div class="bar">
+      <label>Rep <input type="text" id="rep" list="reps" placeholder="Who gets these doors?" size="24" autocomplete="off"></label><datalist id="reps">${state.reps.map(r => `<option value="${esc(r)}">`).join('')}</datalist>
+      <label>ISP <select id="isp"><option value="">work it out</option>${state.isps.map(i => `<option>${esc(i)}</option>`).join('')}</select></label>
+      <label class="small"><input type="checkbox" id="fillzip"> fill blank zips from the city</label>
+      <button class="go" id="build" ${problems.length || !usable.length ? 'disabled' : ''}>Build the import</button>
+    </div>
+    <div id="result"></div>`;
+  j.sheets.forEach((s, si) => {
+    const box = document.querySelector(`[data-sheet="${si}"]`);
+    box.querySelector('.use').onchange = (e) => { s.mapping.use = e.target.checked; if (!s.mapping.cols) s.mapping.cols = {}; if (!Number.isInteger(s.mapping.header_row)) s.mapping.header_row = 0; draw(); };
+    const hr = box.querySelector('.hrow'); if (hr) hr.onchange = (e) => { s.mapping.header_row = Number(e.target.value); s.mapping.source = 'you'; draw(); };
+    box.querySelectorAll('select[data-field]').forEach(sel => sel.onchange = () => { if (sel.value === '') delete s.mapping.cols[sel.dataset.field]; else s.mapping.cols[sel.dataset.field] = Number(sel.value); s.mapping.source = 'you'; draw(); });
+  });
+  $('build').onclick = build;
+}
+
+function sheetHtml(s, si) {
+  const m = s.mapping, hdr = s.head[m.header_row || 0] || [];
+  const opts = (f) => `<option value="">not in this file</option>` + Array.from({ length: s.width }, (_, i) => `<option value="${i}" ${m.cols && m.cols[f] === i ? 'selected' : ''}>${esc(hdr[i] || `column ${i + 1}`)}</option>`).join('');
+  const pv = m.use ? rowsFor(s) : [], shown = ['streetnum', 'street', 'unit', 'city', 'state', 'zip', 'sector', 'status', 'customer'].filter(f => pv.some(r => r[f]));
+  return `<div class="sheet${m.use ? '' : ' off'}" data-sheet="${si}">
+    <h4><label><input type="checkbox" class="use" ${m.use ? 'checked' : ''}> ${esc(s.name)}</label><span class="muted small">${(s.rows - 1).toLocaleString()} rows</span>${m.use ? `<span class="tag ${esc(m.source || '')}">${esc(SOURCE[m.source] || 'set by you')}</span>` : '<span class="tag">left out</span>'}</h4>
+    ${m.note ? `<div class="warn">${esc(m.note)}</div>` : ''}
+    ${m.use ? `<label class="small muted">Header row <select class="hrow">${s.head.slice(0, 6).map((r, i) => `<option value="${i}" ${i === m.header_row ? 'selected' : ''}>${i + 1}: ${esc(r.filter(Boolean).slice(0, 4).join(', ').slice(0, 60))}</option>`).join('')}</select></label>
+    <div class="cols">${Object.keys(FIELDS).map(f => `<label>${FIELDS[f]}<select data-field="${f}">${opts(f)}</select></label>`).join('')}</div>
+    ${check(s).map(p => `<div class="bad">${esc(p)}</div>`).join('')}${(s.warnings || []).map(w => `<div class="warn">${esc(w)}</div>`).join('')}
+    ${pv.length ? `<table class="pv"><tr>${shown.map(f => `<th>${FIELDS[f]}</th>`).join('')}</tr>${pv.map(r => `<tr>${shown.map(f => `<td>${esc(r[f])}</td>`).join('')}</tr>`).join('')}</table>` : ''}` : ''}
+  </div>`;
+}
+
+async function build() {
+  const rep = $('rep').value.trim();
+  if (!state.reps.some(r => r.toLowerCase() === rep.toLowerCase())) { $('result').innerHTML = '<div class="fail">Pick a rep from the list. There is no default rep.</div>'; return; }
+  $('build').disabled = true;
+  $('result').innerHTML = '<pre id="out"></pre>';
+  const mapping = Object.fromEntries(cur.sheets.map(s => [s.name, { use: s.mapping.use, header_row: s.mapping.header_row, cols: s.mapping.cols }]));
+  const res = await fetch('/api/leads/build', { method: 'POST', body: JSON.stringify({ file: cur.file, rep, isp: $('isp').value || null, fillZip: $('fillzip').checked, mapping }) });
+  const reader = res.body.getReader(), dec = new TextDecoder(); let all = '';
+  for (;;) { const { done, value } = await reader.read(); if (done) break; all += dec.decode(value, { stream: true }); const o = $('out'); o.textContent = all.replace(/\n\[result .*\]\n$/s, ''); o.scrollTop = o.scrollHeight; }
+  const m = /\[result (.*)\]\s*$/s.exec(all); let out = { ok: false, why: 'no result came back' }; try { if (m) out = JSON.parse(m[1]); } catch {}
+  $('result').insertAdjacentHTML('beforeend', out.ok
+    ? `<div class="done"><strong>${esc(out.status)}</strong>${out.ready ? `<br>File: ${esc(out.ready)}` : ''}${out.dropped ? '<br><strong>Rows were DROPPED. Read the output above before uploading.</strong>' : ''}<br>Upload it in SalesRabbit when you are ready.</div>`
+    : `<div class="fail">${esc(out.why)}</div>`);
+  if (out.ok) { cur = null; refresh(); } else $('build').disabled = false;
+}
+
+async function send(file) {
+  if (!file) return;
+  $('dropmsg').textContent = `Saving ${file.name}…`;
+  const r = await fetch('/api/leads/upload?name=' + encodeURIComponent(file.name), { method: 'POST', body: file });
+  const j = await r.json();
+  $('dropmsg').innerHTML = j.error ? `<span class="bad">${esc(j.error)}</span>` : `Saved${j.isp ? ` · looks like ${esc(j.isp)}` : ''}. Drop another any time.`;
+  refresh(j.error ? null : j.file);
+}
+const drop = $('drop');
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); send(e.dataTransfer.files[0]); };
+$('pick').onclick = (e) => { e.preventDefault(); $('fileIn').click(); };
+$('fileIn').onchange = (e) => send(e.target.files[0]);
+refresh();
+</script>
+</body>
+</html>

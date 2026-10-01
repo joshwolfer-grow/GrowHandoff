@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Grow Weekly Schedule</title>
+<meta name="description" content="Send your manager your schedule for the week.">
+<!-- Public weekly schedule form. The manager copies the link from More >
+     Schedule (/schedule?team=<manager>). Reads and writes through
+     /api/schedule, which only lets a rep save their own row, for a name on
+     that team, for this week or next week. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f2f2ec;--card:#fff;--ink:#0b0c0b;--ink3:#48484a;--ink4:#86868b;
+  --line:rgba(60,60,67,0.12);--green:#178f3f;--lime:#34c759;--tint:#e6f4ea;--red:#ff3b30;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+.hd{background:#000;color:#fff;padding:22px 18px 20px;}
+.hd-in,.wrap{max-width:460px;margin:0 auto;}
+.logo{height:26px;display:block;}
+.kick{color:var(--lime);font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;margin-top:20px;}
+.title{font-family:'Archivo Black',Impact,sans-serif;font-size:27px;line-height:1.02;text-transform:uppercase;margin-top:4px;}
+.team{color:#9da09c;font-size:13px;margin-top:6px;}
+.seg{display:flex;background:#1c1c1e;border-radius:10px;padding:3px;margin-top:14px;}
+.seg button{flex:1;border:0;background:none;color:#b9bcb8;font:600 14px inherit;font-family:inherit;padding:8px;border-radius:8px;cursor:pointer;}
+.seg button.on{background:#fff;color:#000;}
+.wrap{padding:16px 14px 110px;}
+label.lb{display:block;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ink4);margin:0 0 6px 2px;}
+select{width:100%;padding:13px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);font-family:inherit;font-size:16px;appearance:none;}
+.hint{font-size:12px;color:var(--ink4);margin:6px 2px 16px;}
+.day{background:#fff;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden;}
+.day.act{border:2px solid var(--green);}
+.row{display:flex;align-items:center;justify-content:space-between;padding:13px 14px;cursor:pointer;user-select:none;}
+.dn{font-weight:700;font-size:15px;}
+.dd{color:var(--ink4);font-weight:500;margin-left:6px;font-size:14px;}
+.pill{background:var(--tint);color:#12602c;border-radius:7px;padding:4px 9px;font-size:13px;font-weight:600;}
+.off{color:var(--ink4);font-size:14px;}
+.ed{border-top:1px solid var(--line);padding:12px 12px 14px;}
+.wheels{display:flex;align-items:center;gap:10px;justify-content:center;}
+.wcol{flex:1;max-width:150px;}
+.wlab{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ink4);text-align:center;margin-bottom:4px;}
+.wheel{position:relative;height:180px;overflow-y:scroll;scroll-snap-type:y mandatory;background:var(--bg);border-radius:10px;scrollbar-width:none;
+  -webkit-mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent);mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent);}
+.wheel::-webkit-scrollbar{display:none;}
+.wheel div{height:36px;line-height:36px;text-align:center;font-size:17px;scroll-snap-align:center;color:var(--ink3);}
+.wheel div.sel{color:var(--ink);font-weight:700;}
+.wheel .pad{height:72px;scroll-snap-align:none;}
+.wband{position:relative;}
+.wband::after{content:"";position:absolute;left:6px;right:6px;top:calc(50% + 7px);height:36px;margin-top:-18px;border-radius:8px;border:2px solid var(--green);pointer-events:none;}
+.to{color:var(--ink4);font-size:14px;padding-top:18px;}
+.acts{display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:8px;}
+.lnk{background:none;border:0;font:600 14px inherit;font-family:inherit;color:var(--green);padding:6px 2px;cursor:pointer;}
+.lnk.gray{color:var(--ink4);}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+.chip{border:1px solid var(--line);background:#fff;border-radius:18px;padding:7px 12px;font:600 14px inherit;font-family:inherit;color:var(--ink);cursor:pointer;}
+.chip.on{background:var(--green);border-color:var(--green);color:#fff;}
+.chip.me{opacity:.35;cursor:default;}
+.tot{text-align:center;font-size:14px;color:var(--ink3);margin:14px 0 10px;}
+.tot b{color:var(--ink);}
+.offwk{width:100%;border:1px dashed rgba(0,0,0,.2);background:none;border-radius:12px;padding:12px;font:600 15px inherit;font-family:inherit;color:var(--ink3);cursor:pointer;}
+.offwk.on{border-style:solid;border-color:var(--ink);background:#fff;color:var(--ink);}
+.bar{position:fixed;left:0;right:0;bottom:0;background:rgba(242,242,236,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding:10px 14px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);}
+.bar .in{max-width:460px;margin:0 auto;}
+.go{width:100%;padding:15px;border:0;border-radius:13px;background:#000;color:#fff;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;}
+.go:disabled{opacity:.45;}
+.err{color:var(--red);font-size:13px;text-align:center;min-height:0;margin-bottom:6px;}
+.done{background:#fff;border-radius:14px;padding:26px 18px;text-align:center;border:1px solid var(--line);}
+.done .ck{width:52px;height:52px;border-radius:50%;background:var(--green);color:#fff;font-size:28px;line-height:52px;margin:0 auto;}
+.done h2{font-family:'Archivo Black',Impact,sans-serif;text-transform:uppercase;font-size:22px;margin:14px 0 4px;font-weight:400;}
+.done p{color:var(--ink3);font-size:14px;margin:0 0 14px;}
+.sum{text-align:left;border-top:1px solid var(--line);margin-top:6px;}
+.sum div{display:flex;justify-content:space-between;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px;}
+.msg{background:#fff;border-radius:14px;padding:22px 18px;text-align:center;color:var(--ink3);border:1px solid var(--line);}
+</style>
+</head>
+<body>
+<div class="hd"><div class="hd-in">
+  <img class="logo" src="/grow-wordmark.png" alt="Grow">
+  <div class="kick">Weekly schedule</div>
+  <div class="title" id="title">Loading</div>
+  <div class="team" id="teamName"></div>
+  <div class="seg" id="seg" style="display:none"><button data-w="0">This week</button><button data-w="1">Next week</button></div>
+</div></div>
+<div class="wrap" id="app"></div>
+<div class="bar" id="bar" style="display:none"><div class="in"><div class="err" id="err"></div><button class="go" id="go">Submit schedule</button></div></div>
+
+<script>
+(function(){
+var DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var START_MIN=6*60,END_MAX=24*60;   // the wheel runs 6:00a to 12:00a
+var team=(new URLSearchParams(location.search).get('team')||'').trim();
+var S={weeks:null,week:null,reps:[],submitted:{},rep:'',days:{},offWeek:false,open:null,apply:null,last:{s:16*60,e:20*60},done:false};
+var app=document.getElementById('app');
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function addDays(ds,n){var d=new Date(ds+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
+function md(ds){var d=new Date(ds+'T12:00:00Z');return MON[d.getUTCMonth()]+' '+d.getUTCDate();}
+function tm(m){if(m>=1440)return '12:00a';var h=Math.floor(m/60),mm=m%60,ap=h<12?'a':'p';h=h%12||12;return h+':'+String(mm).padStart(2,'0')+ap;}
+function hrs(){if(S.offWeek)return 0;var t=0;Object.keys(S.days).forEach(function(d){t+=S.days[d].e-S.days[d].s;});return Math.round(t/60*100)/100;}
+function fmtH(h){return (Math.round(h*100)/100)+(h===1?' hour':' hours');}
+function lsKey(){return 'growSchedRep:'+team;}
+
+function api(method,qs,body){
+  return fetch('/api/schedule'+(qs||''),{method:method,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined})
+    .then(function(r){return r.json().catch(function(){return {};}).then(function(j){if(!r.ok)throw new Error(j.error||'Something went wrong. Try again.');return j;});});
+}
+
+function load(week){
+  app.innerHTML='<div class="msg">Loading your team</div>';
+  api('GET','?team='+encodeURIComponent(team)+(week?'&week='+week:'')).then(function(j){
+    S.weeks=j.weeks;S.week=j.week;S.reps=j.reps||[];S.submitted=j.submitted||{};S.open=null;S.apply=null;S.done=false;
+    document.getElementById('teamName').textContent=j.team+"'s team";
+    var seg=document.getElementById('seg');seg.style.display='flex';
+    [].forEach.call(seg.children,function(b){b.classList.toggle('on',S.weeks[+b.dataset.w]===S.week);});
+    document.getElementById('title').textContent=md(S.week)+' to '+md(addDays(S.week,6));
+    if(!S.rep){try{var saved=localStorage.getItem(lsKey());if(saved&&S.reps.indexOf(saved)>=0)S.rep=saved;}catch(e){}}
+    if(S.rep&&S.reps.indexOf(S.rep)<0)S.rep='';
+    pickRep(S.rep);
+  }).catch(function(e){
+    document.getElementById('title').textContent='Link not working';
+    app.innerHTML='<div class="msg">'+esc(e.message)+'</div>';
+    document.getElementById('bar').style.display='none';
+  });
+}
+
+function pickRep(name){
+  S.rep=name;S.days={};S.offWeek=false;S.open=null;S.apply=null;S.done=false;setErr('');
+  var sub=name&&S.submitted[name];
+  if(sub){S.offWeek=!!sub.off_week;(sub.days||[]).forEach(function(x){S.days[x.d]={s:x.s,e:x.e};});}
+  if(name){try{localStorage.setItem(lsKey(),name);}catch(e){}}
+  render();
+}
+
+function setErr(t){document.getElementById('err').textContent=t||'';}
+
+function render(){
+  var bar=document.getElementById('bar');
+  if(S.done){bar.style.display='none';renderDone();return;}
+  var h='<label class="lb" for="rep">Your name</label><select id="rep"><option value="">Pick your name</option>'
+    +S.reps.map(function(r){return '<option'+(r===S.rep?' selected':'')+'>'+esc(r)+'</option>';}).join('')+'</select>'
+    +'<div class="hint">'+(S.rep&&S.submitted[S.rep]?'You already sent this week. Change anything and submit again.':"Don't see your name? Text your manager.")+'</div>';
+  if(!S.rep){app.innerHTML=h;bar.style.display='none';bind();return;}
+  if(!S.offWeek){
+    for(var i=0;i<7;i++){
+      var d=addDays(S.week,i),on=S.days[d],open=S.open===d;
+      h+='<div class="day'+(open?' act':'')+'"><div class="row" data-day="'+d+'"><span><span class="dn">'+DOW[i]+'</span><span class="dd">'+md(d)+'</span></span>'
+        +(on?'<span class="pill">'+tm(on.s)+' to '+tm(on.e)+'</span>':'<span class="off">Off</span>')+'</div>';
+      if(open&&on)h+=editor(d,on);
+      h+='</div>';
+    }
+    h+='<div class="tot"><b>'+fmtH(hrs())+'</b> this week</div>';
+  }
+  h+='<button class="offwk'+(S.offWeek?' on':'')+'" id="offwk">'+(S.offWeek?'Not working this week. Tap to add days':'Not working this week')+'</button>';
+  app.innerHTML=h;bar.style.display='block';
+  document.getElementById('go').disabled=!S.offWeek&&!Object.keys(S.days).length;
+  bind();
+  if(S.open&&S.days[S.open])initWheels(S.open);
+}
+
+function editor(d,on){
+  var h='<div class="ed"><div class="wheels">'
+    +'<div class="wcol"><div class="wlab">Start</div><div class="wband"><div class="wheel" data-k="s">'+wheelItems(START_MIN,END_MAX-15)+'</div></div></div>'
+    +'<div class="to">to</div>'
+    +'<div class="wcol"><div class="wlab">End</div><div class="wband"><div class="wheel" data-k="e">'+wheelItems(START_MIN+15,END_MAX)+'</div></div></div>'
+    +'</div>';
+  if(S.apply===d){
+    h+='<div class="chips">'+[0,1,2,3,4,5,6].map(function(i){var x=addDays(S.week,i);
+      if(x===d)return '<button class="chip me" disabled>'+DOW[i]+'</button>';
+      return '<button class="chip'+(S.days[x]&&S.days[x].s===on.s&&S.days[x].e===on.e?' on':'')+'" data-copy="'+x+'">'+DOW[i]+'</button>';}).join('')+'</div>'
+      +'<div class="acts"><span class="off" style="font-size:13px">Tap the days that get '+tm(on.s)+' to '+tm(on.e)+'</span><button class="lnk" data-applydone="1">Done</button></div>';
+  }else{
+    h+='<div class="acts"><button class="lnk gray" data-dayoff="'+d+'">Turn day off</button><button class="lnk" data-apply="'+d+'">Apply to other days</button></div>';
+  }
+  return h+'</div>';
+}
+function wheelItems(a,b){var h='<div class="pad"></div>';for(var m=a;m<=b;m+=15)h+='<div data-m="'+m+'">'+tm(m)+'</div>';return h+'<div class="pad"></div>';}
+
+function initWheels(d){
+  [].forEach.call(app.querySelectorAll('.wheel'),function(w){
+    var k=w.dataset.k,val=S.days[d][k],it=w.querySelector('[data-m="'+val+'"]');
+    if(it)w.scrollTop=it.offsetTop-72;
+    mark(w);
+    // Only a person moving the wheel changes a time. Every render rebuilds the
+    // wheels and positions them in code, and those scroll events used to be
+    // saved back as if the rep had spun it.
+    var t=null,user=false;
+    ['pointerdown','touchstart','wheel','keydown'].forEach(function(ev){w.addEventListener(ev,function(){user=true;},{passive:true});});
+    w.addEventListener('scroll',function(){
+      mark(w);clearTimeout(t);
+      if(!user)return;
+      t=setTimeout(function(){
+        if(!document.body.contains(w))return;
+        var m=+((w.querySelector('.sel')||{}).dataset||{}).m;if(isNaN(m))return;
+        var day=S.days[d];if(!day)return;
+        day[k]=m;
+        // Keep the shift at least 15 minutes long by nudging the other wheel.
+        if(day.e<=day.s){if(k==='s'){day.e=Math.min(END_MAX,day.s+60);}else{day.s=Math.max(START_MIN,day.e-60);}render();return;}
+        S.last={s:day.s,e:day.e};
+        var row=app.querySelector('.row[data-day="'+d+'"] .pill');if(row)row.textContent=tm(day.s)+' to '+tm(day.e);
+        var tot=app.querySelector('.tot b');if(tot)tot.textContent=fmtH(hrs());
+      },120);
+    },{passive:true});
+    w.addEventListener('click',function(ev){var it=ev.target.closest('[data-m]');if(it)w.scrollTo({top:it.offsetTop-72,behavior:'smooth'});});
+  });
+}
+function mark(w){
+  var mid=w.scrollTop+90,best=null,bd=1e9;
+  [].forEach.call(w.querySelectorAll('[data-m]'),function(it){var c=it.offsetTop+18,dd=Math.abs(c-mid);if(dd<bd){bd=dd;best=it;}it.classList.remove('sel');});
+  if(best)best.classList.add('sel');
+}
+
+function bind(){
+  var sel=document.getElementById('rep');if(sel)sel.onchange=function(){pickRep(sel.value);};
+  [].forEach.call(app.querySelectorAll('.row'),function(r){r.onclick=function(){
+    var d=r.dataset.day;setErr('');
+    if(!S.days[d]){S.days[d]={s:S.last.s,e:S.last.e};S.open=d;}
+    else S.open=S.open===d?null:d;
+    S.apply=null;render();
+  };});
+  var ow=document.getElementById('offwk');if(ow)ow.onclick=function(){S.offWeek=!S.offWeek;S.open=null;setErr('');render();};
+  app.onclick=function(ev){
+    var t=ev.target;
+    if(t.dataset.dayoff){delete S.days[t.dataset.dayoff];S.open=null;render();}
+    else if(t.dataset.apply){S.apply=t.dataset.apply;render();}
+    else if(t.dataset.applydone){S.apply=null;render();}
+    else if(t.dataset.copy){
+      var src=S.days[S.apply],x=t.dataset.copy;if(!src)return;
+      if(S.days[x]&&S.days[x].s===src.s&&S.days[x].e===src.e)delete S.days[x];else S.days[x]={s:src.s,e:src.e};
+      render();
+    }
+  };
+}
+
+document.getElementById('seg').onclick=function(ev){var b=ev.target.closest('button');if(!b||!S.weeks)return;var w=S.weeks[+b.dataset.w];if(w!==S.week)load(w);};
+
+document.getElementById('go').onclick=function(){
+  var btn=this;setErr('');
+  var days=Object.keys(S.days).sort().map(function(d){return {d:d,s:S.days[d].s,e:S.days[d].e};});
+  btn.disabled=true;btn.textContent='Sending';
+  api('POST','',{team:team,rep:S.rep,week:S.week,days:S.offWeek?[]:days,off_week:S.offWeek}).then(function(j){
+    S.submitted[S.rep]={days:j.days,off_week:j.off_week};S.done=true;render();
+  }).catch(function(e){setErr(e.message);}).then(function(){btn.disabled=false;btn.textContent='Submit schedule';});
+};
+
+function renderDone(){
+  var sub=S.submitted[S.rep]||{days:[]},h='<div class="done"><div class="ck">✓</div><h2>You\'re set</h2><p>Your manager can see your schedule for '+md(S.week)+' to '+md(addDays(S.week,6))+'.</p>';
+  if(sub.off_week)h+='<div class="sum"><div><span>Not working this week</span></div></div>';
+  else{
+    h+='<div class="sum">'+sub.days.map(function(x){var i=new Date(x.d+'T12:00:00Z').getUTCDay();return '<div><span>'+DOW[i]+' '+md(x.d)+'</span><b>'+tm(x.s)+' to '+tm(x.e)+'</b></div>';}).join('')
+      +'<div><span>Total</span><b>'+fmtH(hrs())+'</b></div></div>';
+  }
+  h+='<button class="lnk" id="edit" style="margin-top:12px">Change my schedule</button></div>';
+  app.innerHTML=h;
+  document.getElementById('edit').onclick=function(){S.done=false;render();};
+}
+
+if(!team){document.getElementById('title').textContent='Link not working';app.innerHTML='<div class="msg">This link is missing its team. Ask your manager for the schedule link.</div>';return;}
+// Wednesday on, most reps are sending next week.
+var now=new Date(),sun=new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()-now.getDay(),12));
+load(now.getDay()>=3?addDays(sun.toISOString().slice(0,10),7):null);
+})();
+</script>
+</body>
+</html>

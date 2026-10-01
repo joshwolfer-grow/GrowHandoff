@@ -1,0 +1,37 @@
+{
+  "_comment": "Per-account Amplify config for scripts/amplify-company-sync.mjs. One key per company (the `source` label written to the knocking table). Discover ids by running with --probe. Grow itself is NOT here — it stays in scripts/amplify-knocking-sync.mjs.",
+
+  "tds": {
+    "activityTypeId": 2451,
+    "tz": "America/Chicago",
+
+    "_includeIds": "Dispositions that count as a door. Everything else in the feed (Customer 32147, Lead 32159, Appointment Set 32145, Address Misclassified 32154, and the legacy 'DON'T USE' pair 206887/232290) is integration/CRM noise, not a rep knock.",
+    "includeIds": [32149, 32153, 32155, 32156, 32157, 32158, 32151, 32152, 32148, 82464, 32150],
+
+    "_contactIds": "Someone answered the door: Not Interested x4 (32155 Fiber, 32156 Cable, 32157 Price, 32158 Won't Discuss), Sold 32152, Come Back 32148, No Solicitation 82464, Do Not Knock 32150.",
+    "contactIds": [32155, 32156, 32157, 32158, 32152, 32148, 82464, 32150],
+
+    "soldId": 32152,
+    "excludeUsers": [],
+
+    "_excludeReps": "Dropped entirely. Jesse Maxwell was deleted from Bria, so his knocking has no comp data to attach to and would sit on unreliable Amplify pins.",
+    "excludeReps": ["Jesse Maxwell"],
+
+    "_includeOrigins": "SalesRabbit GPS verification of where the disposition was logged: 4915 'At location', 4910 'Near location' = a real knocked door. Excluded: 4911 'Not at location' (logged away from the door) and 4913 'Unknown' (the 6am integration import, no GPS). Matches the origin filter TDS already uses in the Amplify UI.",
+    "includeOrigins": [4915, 4910],
+
+    "_dispositionNames": {
+      "32148": "Come Back",
+      "32149": "Not Home",
+      "32150": "Do Not Knock",
+      "32151": "Other",
+      "32152": "Sold",
+      "32153": "Vacant Lot",
+      "32155": "Not Interested - Fiber",
+      "32156": "Not Interested - Cable",
+      "32157": "Not Interested - Price",
+      "32158": "Not Interested - Won't Discuss",
+      "82464": "No Solicitation"
+    }
+  }
+}

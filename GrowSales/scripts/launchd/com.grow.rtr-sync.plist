@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Opendoor "Time Track Highlight" -> knocking. Hourly, 8am-10pm.
+
+  Same cadence as before — hourly — just starting at 8am instead of 2pm, so the
+  board is current from the start of the day rather than only from mid-afternoon.
+  ~15 runs a day against ~10 before.
+
+  The one structural change: StartInterval, like the sr-sync and amplify-sync
+  agents, with the window enforced inside run-rtr-sync.sh (RTR_START_HOUR /
+  RTR_END_HOUR) instead of a list of calendar hours. This is a laptop, and
+  StartCalendarInterval firings missed while the lid is shut are DROPPED, not
+  queued — which is how the board could sit hours stale with no run to fix it.
+  launchd coalesces missed StartInterval firings into one catch-up run on wake,
+  and since the report is cumulative for the day that single run restores the
+  whole day.
+
+  Cost is worth knowing since this renders a report on Opendoor's SSRS server
+  rather than hitting a JSON API. Every 30 min across the 8am-10pm window is ~28
+  renders a day per ISP, up from ~15 hourly. That was a deliberate stopping
+  point: the report is CUMULATIVE for the day, so cadence buys smoothness, not
+  correctness — hourly made a rep's doors climb in visible steps (49 -> 135 ->
+  303 -> 526 on 2026-08-07) and 30 min halves that. Going to 10 min would be ~84
+  Chrome renders a day against someone else's reporting box for very little
+  more, so it was considered and declined.
+
+  To change it, edit StartInterval below (1800 = every 30 min) or the hours in
+  run-rtr-sync.sh, and the `every:` / `sched:` values on the 'rtr' row in
+  index.html (_growSyncStatus) so the health board stays honest.
+
+  Outside the window the script exits immediately without touching Chrome or
+  Opendoor, so off-hours ticks cost nothing.
+
+  Sealing yesterday: unchanged, and NOT pinned to an hour. The runner seals on
+  the first successful run of each day, tracked by imports/done/rtr-last-sealed,
+  which with this window is the ~8am run. Reps' phones sync to SalesRabbit after
+  they stop knocking, so that morning re-pull is what makes yesterday final.
+
+  Install:
+    cp scripts/launchd/com.grow.rtr-sync.plist ~/Library/LaunchAgents/
+    launchctl unload ~/Library/LaunchAgents/com.grow.rtr-sync.plist 2>/dev/null
+    launchctl load ~/Library/LaunchAgents/com.grow.rtr-sync.plist
+  Check:   launchctl list | grep rtr-sync
+  Remove:  launchctl unload ~/Library/LaunchAgents/com.grow.rtr-sync.plist
+
+  FIRST: node scripts/rtr-sync.mjs --login   (a window opens; sign in once)
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.grow.rtr-sync</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/joshuawolfer/Grow/GrowSales/scripts/run-rtr-sync.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>/Users/joshuawolfer/.nvm/versions/node/v20.20.2/bin:/usr/bin:/bin:/usr/local/bin</string></dict>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>2</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>10</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>40</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>50</integer></dict>
+    <dict><key>Hour</key><integer>22</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+  <key>StandardErrorPath</key>
+  <string>/Users/joshuawolfer/Grow/GrowSales/imports/done/rtr-sync-agent.err</string>
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

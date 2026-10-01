@@ -1,0 +1,177 @@
+{
+  "_comment": "Each entry becomes ~/Library/LaunchAgents/com.wolfoffice.<name>.plist via bin/install-workers.sh. 'agent' null = script logs on its own; otherwise office-wrap logs start/finish. Schedule: interval seconds, or calendar {hour,minute,weekday?}.",
+  "workers": [
+    {
+      "name": "analyst",
+      "agent": "analyst",
+      "cmd": "node __WOLFOFFICE__/workers/grow/analyst.mjs",
+      "calendar": {
+        "hour": 7,
+        "minute": 30
+      }
+    },
+    {
+      "name": "installs",
+      "agent": "installs",
+      "cmd": "node __WOLFOFFICE__/workers/grow/installs.mjs",
+      "calendar": {
+        "hour": 7,
+        "minute": 35
+      }
+    },
+    {
+      "name": "chaser",
+      "agent": "chaser",
+      "cmd": "node __WOLFOFFICE__/workers/grow/chaser.mjs",
+      "calendar": {
+        "hour": 7,
+        "minute": 40
+      }
+    },
+    {
+      "name": "payaudit",
+      "agent": "payaudit",
+      "cmd": "node __WOLFOFFICE__/workers/grow/payaudit.mjs",
+      "calendar": {
+        "weekday": 4,
+        "hour": 6,
+        "minute": 0
+      }
+    },
+    {
+      "name": "mgrcards",
+      "agent": "mgrcards",
+      "cmd": "node __HOME__/Grow/GrowSales/scripts/daily-report-text.mjs --scheduled --send",
+      "calendar": {
+        "hour": 9,
+        "minute": 0
+      }
+    },
+    {
+      "name": "runner-grow",
+      "agent": null,
+      "cmd": "node __WOLFOFFICE__/workers/runner/runner.mjs grow",
+      "interval": 60
+    },
+    {
+      "name": "chief-grow",
+      "agent": "chief-grow",
+      "cmd": "node __WOLFOFFICE__/workers/chief/chief.mjs grow",
+      "calendar": {
+        "hour": 8,
+        "minute": 0
+      }
+    },
+    {
+      "name": "isp-i3",
+      "agent": "isp-i3",
+      "cmd": "node __WOLFOFFICE__/workers/grow/isp.mjs i3",
+      "calendar": {
+        "hour": 7,
+        "minute": 15
+      }
+    },
+    {
+      "name": "isp-slic",
+      "agent": "isp-slic",
+      "cmd": "node __WOLFOFFICE__/workers/grow/isp.mjs slic",
+      "calendar": {
+        "hour": 7,
+        "minute": 17
+      }
+    },
+    {
+      "name": "isp-lyte",
+      "agent": "isp-lyte",
+      "cmd": "node __WOLFOFFICE__/workers/grow/isp.mjs lyte",
+      "calendar": {
+        "hour": 7,
+        "minute": 19
+      }
+    },
+    {
+      "name": "isp-surf",
+      "agent": "isp-surf",
+      "cmd": "node __WOLFOFFICE__/workers/grow/isp.mjs surf",
+      "calendar": {
+        "hour": 7,
+        "minute": 21
+      }
+    },
+    {
+      "name": "isp-tds",
+      "agent": "isp-tds",
+      "cmd": "node __WOLFOFFICE__/workers/grow/isp.mjs tds",
+      "calendar": {
+        "hour": 7,
+        "minute": 23
+      }
+    },
+    {
+      "name": "isp-ezee",
+      "agent": "isp-ezee",
+      "cmd": "node __WOLFOFFICE__/workers/grow/isp.mjs ezee",
+      "calendar": {
+        "hour": 7,
+        "minute": 25
+      }
+    },
+    {
+      "name": "isp-omni",
+      "agent": "isp-omni",
+      "cmd": "node __WOLFOFFICE__/workers/grow/isp.mjs omni",
+      "calendar": {
+        "hour": 7,
+        "minute": 27
+      }
+    },
+    {
+      "name": "sales-lead",
+      "agent": "sales-lead",
+      "cmd": "node __WOLFOFFICE__/workers/grow/isp.mjs all",
+      "calendar": {
+        "hour": 7,
+        "minute": 50
+      }
+    },
+    {
+      "name": "slots-tds",
+      "agent": "slots-tds",
+      "cmd": "node __WOLFOFFICE__/workers/grow/slots.mjs tds",
+      "calendar": [
+        {
+          "hour": 6,
+          "minute": 30
+        },
+        {
+          "hour": 11,
+          "minute": 30
+        },
+        {
+          "hour": 15,
+          "minute": 30
+        }
+      ]
+    },
+    {
+      "name": "slots-surf",
+      "agent": "slots-surf",
+      "cmd": "node __WOLFOFFICE__/workers/grow/slots.mjs surf",
+      "calendar": [
+        {
+          "hour": 6,
+          "minute": 45
+        },
+        {
+          "hour": 11,
+          "minute": 45
+        },
+        {
+          "hour": 15,
+          "minute": 45
+        }
+      ]
+    }
+  ],
+  "_paths": "Placeholders: __WOLFOFFICE__ = this repo's folder (normally ~/Grow/WolfOffice), __HOME__ = $HOME. bin/install-workers.sh substitutes both when it writes the plists."
+}

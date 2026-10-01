@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Grow Money Calculator</title>
+<meta name="description" content="Run your own numbers: income, S Corp, and investing.">
+<!-- Public calculator page for the money trainings (Cover Your Bases,
+     Structure It, Invest It, Grow It). No sign in, no network calls, nothing
+     leaves the device. ?c=income|s-corp|invest opens one calculator first and
+     ?deals=<n> prefills deals a week, so a training can link straight to the
+     right one. Numbers match the decks: $60,000 net profit line, 15.3% self
+     employment tax, 8% return. If the decks change, update SE and SAL in the script
+     and the default value on the "line" and "cost" inputs. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f2f2ec;--card:#fff;--ink:#0b0c0b;--ink3:#48484a;--ink4:#86868b;
+  --line:rgba(60,60,67,0.12);--green:#178f3f;--lime:#34c759;--tint:#e6f4ea;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+[hidden]{display:none!important;}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+.hd{background:#000;color:#fff;padding:22px 18px 20px;}
+.hd-in,.wrap{max-width:460px;margin:0 auto;}
+.logo{height:26px;display:block;}
+.kick{color:var(--lime);font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;margin-top:20px;}
+.title{font-family:'Archivo Black',Impact,sans-serif;font-size:27px;line-height:1.02;text-transform:uppercase;margin-top:4px;}
+.seg{display:flex;background:#1c1c1e;border-radius:10px;padding:3px;margin-top:14px;}
+.seg button{flex:1;border:0;background:none;color:#b9bcb8;font-weight:600;font-size:14px;font-family:inherit;padding:8px;border-radius:8px;cursor:pointer;}
+.seg button.on{background:#fff;color:#000;}
+.wrap{padding:18px 14px 60px;}
+label.lb{display:block;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ink4);margin:0 0 6px 2px;}
+input{width:100%;padding:13px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);
+  font-family:inherit;font-size:16px;font-weight:600;appearance:none;-moz-appearance:textfield;font-variant-numeric:tabular-nums;}
+input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+input:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--green);outline-offset:2px;}
+.f{margin-bottom:16px;}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end;}
+.step{display:flex;align-items:stretch;gap:8px;}
+.step input{flex:1;min-width:0;text-align:center;font-size:22px;font-weight:700;}
+.step button{flex:none;width:56px;border:1px solid var(--line);background:#fff;border-radius:12px;font-size:24px;font-weight:500;
+  color:var(--ink);cursor:pointer;font-family:inherit;line-height:1;}
+.step button:active{opacity:.6;}
+.res{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 18px 6px;box-shadow:0 2px 10px rgba(0,0,0,.06);}
+.res.yes{background:var(--tint);}
+.tag{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ink4);}
+.res.yes .tag{color:var(--green);}
+.big{font-family:'Archivo Black',Impact,sans-serif;font-size:46px;line-height:1;margin-top:8px;text-transform:uppercase;
+  font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
+.res.yes .big{color:#0f3d1e;}
+.unit{font-size:14px;color:var(--ink3);margin-top:6px;}
+.rows{margin-top:16px;}
+.r{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:12px 0;border-top:1px solid var(--line);font-size:15px;}
+.r span{color:var(--ink3);}
+.r b{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.adj{margin-top:12px;background:#fff;border:1px solid var(--line);border-radius:12px;}
+.adj summary{padding:13px 14px;font-weight:600;font-size:15px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;border-radius:12px;}
+.adj summary::-webkit-details-marker{display:none;}
+.adj summary::after{content:'+';color:var(--ink4);font-size:20px;font-weight:500;line-height:1;}
+.adj[open] summary::after{content:'\2212';}
+.adj .two{padding:2px 14px 16px;}
+.fine{font-size:12px;color:var(--ink4);line-height:1.5;margin:22px 2px 0;text-align:center;}
+</style>
+</head>
+<body>
+<div class="hd"><div class="hd-in">
+  <img class="logo" src="/grow-wordmark.png" alt="Grow">
+  <div class="kick">Money</div>
+  <div class="title">Run your<br>numbers</div>
+  <div class="seg" id="seg" role="tablist" aria-label="Calculator">
+    <button type="button" role="tab" data-c="income">Income</button>
+    <button type="button" role="tab" data-c="s-corp">S Corp</button>
+    <button type="button" role="tab" data-c="invest">Invest</button>
+  </div>
+</div></div>
+
+<div class="wrap">
+
+  <!-- shared by Income and S Corp -->
+  <div class="f" id="dealsField">
+    <label class="lb" for="deals">Deals a week</label>
+    <div class="step">
+      <button type="button" data-for="deals" data-by="-1" aria-label="One less deal a week">&minus;</button>
+      <input id="deals" type="number" inputmode="decimal" min="0" step="0.5" value="8">
+      <button type="button" data-for="deals" data-by="1" aria-label="One more deal a week">+</button>
+    </div>
+  </div>
+
+  <section id="p-income" role="tabpanel">
+    <div class="res">
+      <div class="tag">You make</div>
+      <div class="big" id="iYear"></div>
+      <div class="unit">a year</div>
+      <div class="rows">
+        <div class="r"><span>Installs a year</span><b id="iInst"></b></div>
+        <div class="r"><span>A month</span><b id="iMonth"></b></div>
+        <div class="r"><span>Tax set aside a month</span><b id="iTax"></b></div>
+        <div class="r"><span>Left a month</span><b id="iLeft"></b></div>
+      </div>
+    </div>
+    <details class="adj">
+      <summary>Adjust</summary>
+      <div class="two">
+        <div><label class="lb" for="cm">Commission per install</label><input id="cm" type="number" inputmode="decimal" min="0" value="230"></div>
+        <div><label class="lb" for="ir">Install rate %</label><input id="ir" type="number" inputmode="decimal" min="0" max="100" value="80"></div>
+        <div><label class="lb" for="wk">Weeks worked</label><input id="wk" type="number" inputmode="decimal" min="0" max="52" value="46"></div>
+        <div><label class="lb" for="tx">Tax set aside %</label><input id="tx" type="number" inputmode="decimal" min="0" max="60" value="30"></div>
+      </div>
+    </details>
+  </section>
+
+  <section id="p-s-corp" role="tabpanel" hidden>
+    <div class="f">
+      <label class="lb" for="exp">Business expenses a month</label>
+      <input id="exp" type="number" inputmode="decimal" min="0" step="50" value="1000">
+    </div>
+    <div class="res" id="sCard">
+      <div class="tag">S Corp</div>
+      <div class="big" id="sVerdict"></div>
+      <div class="unit" id="sUnit"></div>
+      <div class="rows">
+        <div class="r"><span>Net profit</span><b id="sNet"></b></div>
+        <div class="r"><span>The line</span><b id="sLine"></b></div>
+        <div class="r"><span id="sGapLabel"></span><b id="sGap"></b></div>
+        <div class="r" id="sNeedRow"><span>Deals a week to get there</span><b id="sNeed"></b></div>
+        <div class="r"><span>Tax saved a year</span><b id="sSaved"></b></div>
+        <div class="r"><span>Cost a year</span><b id="sCost"></b></div>
+        <div class="r"><span>Ahead a year</span><b id="sAhead"></b></div>
+      </div>
+    </div>
+    <details class="adj">
+      <summary>Adjust</summary>
+      <div class="two">
+        <div><label class="lb" for="cost">Cost a year</label><input id="cost" type="number" inputmode="decimal" min="0" step="100" value="1600"></div>
+        <div><label class="lb" for="line">The line</label><input id="line" type="number" inputmode="decimal" min="0" step="1000" value="60000"></div>
+      </div>
+    </details>
+  </section>
+
+  <section id="p-invest" role="tabpanel" hidden>
+    <div class="two f">
+      <div><label class="lb" for="save">Set aside a month</label><input id="save" type="number" inputmode="decimal" min="0" step="50" value="1000"></div>
+      <div><label class="lb" for="age">Your age</label><input id="age" type="number" inputmode="numeric" min="16" max="64" value="23"></div>
+    </div>
+    <div class="res">
+      <div class="tag">At 65</div>
+      <div class="big" id="vAt65"></div>
+      <div class="unit" id="vUnit"></div>
+      <div class="rows">
+        <div class="r"><span>You put in</span><b id="vPut"></b></div>
+        <div class="r"><span id="vStopLabel"></span><b id="vStop"></b></div>
+        <div class="r"><span>Every dollar becomes</span><b id="vMult"></b></div>
+      </div>
+    </div>
+    <details class="adj">
+      <summary>Adjust</summary>
+      <div class="two">
+        <div><label class="lb" for="yrs">Years you set aside</label><input id="yrs" type="number" inputmode="decimal" min="0" max="45" value="4"></div>
+        <div><label class="lb" for="ret">Yearly return %</label><input id="ret" type="number" inputmode="decimal" min="0" max="20" step="0.5" value="8"></div>
+      </div>
+    </details>
+  </section>
+
+  <p class="fine">Education only. Not financial, tax, or legal advice. Every number is an estimate. Nothing you enter leaves this device.</p>
+</div>
+
+<script>
+(function(){
+  var TABS=['income','s-corp','invest'];
+  var SE=0.153;                       // self employment tax the S Corp saves on distributions
+  // reasonable salary by net profit, the same rungs the Structure It deck shows
+  var SAL=[[0,0],[40000,28000],[50000,35000],[60000,40000],[80000,50000],[100000,60000],[150000,85000]];
+  var FIELDS=['deals','cm','ir','wk','tx','exp','cost','line','save','age','yrs','ret'];
+  var STORE='grow_calc_v1';
+  var tab='income',saveTouched=false;
+  var $=function(id){return document.getElementById(id);};
+
+  function num(id,fb){var v=parseFloat($(id).value);return isFinite(v)&&v>=0?v:fb;}
+  function money(n){return '$'+Math.round(n).toLocaleString('en-US');}
+  function big(n){return n>=1e6?'$'+(n/1e6).toFixed(2)+'M':money(n);}
+  function half(n){return Math.ceil(n*2)/2;}
+  function salary(net){
+    for(var i=1;i<SAL.length;i++){
+      if(net<=SAL[i][0]){var a=SAL[i-1],b=SAL[i];return a[1]+(b[1]-a[1])*(net-a[0])/(b[0]-a[0]);}
+    }
+    var top=SAL[SAL.length-1];return top[1]+(net-top[0])*0.5;
+  }
+
+  function calc(){
+    // income
+    var deals=num('deals',0),cm=num('cm',230),ir=Math.min(num('ir',80),100)/100,wk=Math.min(num('wk',46),52);
+    var tx=Math.min(num('tx',30),100)/100;
+    var inst=deals*wk*ir,gross=inst*cm,mo=gross/12,tax=mo*tx,left=mo-tax;
+    $('iYear').textContent=money(gross);
+    $('iInst').textContent=Math.round(inst).toLocaleString('en-US');
+    $('iMonth').textContent=money(mo);
+    $('iTax').textContent=money(tax);
+    $('iLeft').textContent=money(left);
+
+    // s corp
+    var line=num('line',60000),cost=num('cost',1600),expYr=num('exp',1000)*12;
+    var net=Math.max(0,gross-expYr),saved=Math.max(0,net-salary(net))*SE,ahead=saved-cost,yes=net>=line;
+    $('sCard').className='res'+(yes?' yes':'');
+    $('sVerdict').textContent=yes?'Yes':'Not yet';
+    $('sUnit').textContent=yes?'It pays at your numbers':(ahead<0?'It costs more than it saves':'Too thin to be worth the paperwork');
+    $('sNet').textContent=money(net);
+    $('sLine').textContent=money(line);
+    $('sGapLabel').textContent=yes?'Over the line by':'Short of the line by';
+    $('sGap').textContent=money(Math.abs(net-line));
+    var per=wk*ir*cm;
+    $('sNeedRow').hidden=yes||per<=0;
+    if(per>0)$('sNeed').textContent=String(half((line+expYr)/per));
+    $('sSaved').textContent=money(saved);
+    $('sCost').textContent=money(cost);
+    $('sAhead').textContent=(ahead<0?'−':'')+money(Math.abs(ahead));
+
+    // invest, follows a quarter of what is left until the rep types their own
+    if(!saveTouched)$('save').value=Math.max(0,Math.round(left*0.25/50)*50);
+    var s=num('save',0),age=num('age',23),yrs=Math.min(num('yrs',4),45),ret=num('ret',8)/100;
+    var r=ret/12,n=yrs*12,put=s*n;
+    var stop=r>0?s*((Math.pow(1+r,n)-1)/r):put;
+    var more=Math.max(0,65-(age+yrs)),at65=stop*Math.pow(1+ret,more);
+    $('vAt65').textContent=big(at65);
+    $('vUnit').textContent=more>0?'Left alone for '+Math.round(more)+' more years':'At 65';
+    $('vPut').textContent=money(put);
+    $('vStopLabel').textContent='After '+(+yrs.toFixed(1))+' years';
+    $('vStop').textContent=money(stop);
+    $('vMult').textContent=put>0?'$'+(at65/put).toFixed(2):'$0.00';
+  }
+
+  function show(t){
+    if(TABS.indexOf(t)<0)t='income';
+    tab=t;
+    TABS.forEach(function(k){$('p-'+k).hidden=k!==t;});
+    $('dealsField').hidden=t==='invest';
+    [].forEach.call($('seg').children,function(b){
+      var on=b.dataset.c===t;b.className=on?'on':'';b.setAttribute('aria-selected',on?'true':'false');
+    });
+  }
+
+  function persist(){
+    try{
+      var o={_t:saveTouched};FIELDS.forEach(function(k){o[k]=$(k).value;});
+      localStorage.setItem(STORE,JSON.stringify(o));
+    }catch(e){}
+  }
+
+  // boot: saved numbers first, then the link wins
+  try{
+    var o=JSON.parse(localStorage.getItem(STORE)||'null');
+    if(o){FIELDS.forEach(function(k){if(o[k]!=null&&o[k]!=='')$(k).value=o[k];});saveTouched=!!o._t;}
+  }catch(e){}
+  try{
+    var q=new URLSearchParams(location.search),c=q.get('c'),d=parseFloat(q.get('deals'));
+    if(c)tab=String(c).toLowerCase().replace(/[^a-z]+/g,'-');
+    if(tab==='scorp')tab='s-corp';
+    if(isFinite(d)&&d>=0)$('deals').value=d;
+  }catch(e){}
+
+  document.addEventListener('click',function(e){
+    var b=e.target.closest('button');if(!b)return;
+    if(b.dataset.c){
+      show(b.dataset.c);
+      try{var u=new URL(location.href);u.searchParams.set('c',tab);history.replaceState({},'',u);}catch(_){}
+      return;
+    }
+    if(b.dataset.for){
+      var el=$(b.dataset.for),v=parseFloat(el.value);
+      el.value=Math.max(0,(isFinite(v)?v:0)+Number(b.dataset.by));
+      calc();persist();
+    }
+  });
+  document.addEventListener('input',function(e){
+    if(e.target.id==='save')saveTouched=true;
+    calc();persist();
+  });
+
+  show(tab);
+  calc();
+})();
+</script>
+</body>
+</html>

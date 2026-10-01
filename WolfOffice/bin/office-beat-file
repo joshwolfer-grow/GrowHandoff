@@ -1,0 +1,9 @@
+#!/bin/bash
+# office-beat-file <agent> <file> <max-age-seconds>
+# Heartbeats an agent when a file it writes has been touched recently.
+# Used for loop scripts we don't want to edit (gamma pull, prop sync).
+AGENT="$1"; FILE="$2"; MAX="${3:-300}"
+[ -f "$FILE" ] || exit 0
+AGE=$(( $(date +%s) - $(stat -f %m "$FILE") ))
+[ "$AGE" -le "$MAX" ] && "$HOME/bin/office-log" beat "$AGENT" >/dev/null
+exit 0

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Apply to Grow</title>
+<meta name="description" content="Apply to knock with Grow.">
+<!-- Public apply form. Posts to /api/recruit-intake with no key, which is why
+     that endpoint fences the unkeyed path down to "create one plain new
+     recruit". Lands in More > Recruiting as a card in the New column. -->
+<style>
+:root{
+  --bg:#f2f2ec;--card:#fff;--ink:#0b0c0b;--ink3:#48484a;--ink4:#86868b;
+  --line:rgba(60,60,67,0.12);--input-border:rgba(0,0,0,0.08);--input-bg:rgba(0,0,0,0.03);
+  --green:#178f3f;--red:#ff3b30;--r:14px;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;padding:28px 18px 60px;}
+.wrap{max-width:440px;margin:0 auto;}
+.logo{height:34px;margin-bottom:20px;}
+h1{font-size:25px;font-weight:800;letter-spacing:-0.02em;margin:0 0 6px;}
+.lede{font-size:14px;color:var(--ink3);line-height:1.5;margin:0 0 22px;}
+.card{background:var(--card);border:0.5px solid var(--line);border-radius:var(--r);
+  padding:18px;box-shadow:0 0.5px 2px rgba(0,0,0,0.03);}
+label{display:block;font-size:11px;font-weight:800;letter-spacing:0.07em;
+  text-transform:uppercase;color:var(--ink4);margin:0 0 5px;}
+.f{margin-bottom:14px;}
+input,select{width:100%;padding:11px 12px;border:1px solid var(--input-border);
+  border-radius:10px;background:var(--input-bg);color:var(--ink);
+  font-family:inherit;font-size:16px;}
+input:focus,select:focus{outline:none;border-color:var(--green);background:#fff;}
+select{appearance:none;background-image:none;}
+button{width:100%;padding:14px;border:0;border-radius:12px;background:var(--ink);
+  color:#fff;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;margin-top:4px;}
+button:disabled{opacity:.5;cursor:default;}
+.err{color:var(--red);font-size:13px;min-height:17px;margin-top:8px;}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0;}
+.done{text-align:center;padding:34px 18px;}
+.done .tick{font-size:38px;line-height:1;}
+.done h2{font-size:20px;font-weight:800;margin:12px 0 6px;}
+.done p{font-size:14px;color:var(--ink3);line-height:1.55;margin:0;}
+.fine{font-size:11.5px;color:var(--ink4);line-height:1.5;margin-top:14px;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <img class="logo" src="/grow-wordmark.png" alt="Grow">
+  <div id="formWrap">
+    <h1>Come knock with us</h1>
+    <p class="lede">Fill this out and someone on our team will reach out today. It takes about thirty seconds.</p>
+    <form class="card" id="applyForm" novalidate>
+      <div class="f"><label for="name">Name</label><input id="name" name="name" autocomplete="name" required></div>
+      <div class="f"><label for="phone">Phone</label><input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required></div>
+      <div class="f"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email"></div>
+      <div class="f"><label for="market">City and state</label><input id="market" name="market" autocomplete="address-level2" placeholder="Tulsa, OK"></div>
+      <div class="f"><label for="start">Could you start within two weeks</label>
+        <select id="start"><option value="">Choose one</option><option>Yes</option><option>In a month</option><option>Later than that</option></select></div>
+      <div class="f"><label for="travel">Open to traveling for a summer blitz</label>
+        <select id="travel"><option value="">Choose one</option><option>Yes</option><option>No</option><option>Depends on where</option></select></div>
+      <div class="f"><label for="exp">Sold door to door before</label>
+        <select id="exp"><option value="">Choose one</option><option>No, brand new</option><option>A little</option><option>Yes, a season or more</option></select></div>
+      <!-- honeypot: hidden from people, catnip for bots. The endpoint returns 200
+           and drops anything that fills it, so the bot never learns it failed. -->
+      <input class="hp" tabindex="-1" autocomplete="off" id="company" name="company" aria-hidden="true">
+      <button type="submit" id="sub">Send it</button>
+      <div class="err" id="err"></div>
+    </form>
+    <p class="fine">We use your number to text you about the job, nothing else.</p>
+  </div>
+  <div class="card done" id="done" style="display:none;">
+    <div class="tick">👍</div>
+    <h2>Got it</h2>
+    <p>We have your info. Expect a text or a call from our team shortly. Keep an eye on unknown numbers.</p>
+  </div>
+</div>
+<script>
+document.getElementById('applyForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  var err = document.getElementById('err'), btn = document.getElementById('sub');
+  var v = function(id){ return (document.getElementById(id).value || '').trim(); };
+  var name = v('name'), phone = v('phone');
+  if(!name){ err.textContent = 'Your name is needed.'; return; }
+  if(phone.replace(/\D/g,'').length < 10){ err.textContent = 'A ten digit phone number is needed.'; return; }
+  err.textContent = ''; btn.disabled = true; btn.textContent = 'Sending';
+  try{
+    var r = await fetch('/api/recruit-intake', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        form: 'apply', name: name, phone: phone, email: v('email'), market: v('market'),
+        company: v('company'),
+        answers: { 'Could start within two weeks': v('start'), 'Open to travel': v('travel'), 'D2D experience': v('exp') }
+      })
+    });
+    if(!r.ok) throw new Error('That did not go through. Try once more.');
+    document.getElementById('formWrap').style.display = 'none';
+    document.getElementById('done').style.display = '';
+    window.scrollTo(0,0);
+  }catch(ex){
+    err.textContent = ex.message || 'That did not go through. Try once more.';
+    btn.disabled = false; btn.textContent = 'Send it';
+  }
+});
+</script>
+</body>
+</html>

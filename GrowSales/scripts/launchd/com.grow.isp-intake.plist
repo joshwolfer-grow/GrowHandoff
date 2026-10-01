@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ISP lead file drop folder -> archived, deduped, import built. Every 5 min.
+  Install:
+    cp scripts/launchd/com.grow.isp-intake.plist ~/Library/LaunchAgents/
+    launchctl unload ~/Library/LaunchAgents/com.grow.isp-intake.plist 2>/dev/null
+    launchctl load ~/Library/LaunchAgents/com.grow.isp-intake.plist
+  To have every file go to one rep without asking, add ISP_DEFAULT_REP to
+  EnvironmentVariables below.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.grow.isp-intake</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/joshuawolfer/Grow/GrowSales/scripts/run-isp-intake.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>/Library/Frameworks/Python.framework/Versions/3.10/bin:/Users/joshuawolfer/.nvm/versions/node/v20.20.2/bin:/usr/bin:/bin:/usr/local/bin</string></dict>
+  <key>StartInterval</key>
+  <integer>300</integer>
+  <key>StandardErrorPath</key>
+  <string>/Users/joshuawolfer/Grow/GrowSales/imports/done/isp-intake-agent.err</string>
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

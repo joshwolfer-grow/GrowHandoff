@@ -1,0 +1,8 @@
+# Python packages the scripts and launchd jobs use (python3 -m pip install -r requirements.txt)
+openpyxl>=3.1
+xlsxwriter>=3.2
+pandas>=2.3
+numpy>=2.2
+shapely>=2.1
+scipy>=1.15
+requests>=2.31

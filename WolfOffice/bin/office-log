@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+// bin/office-log — never fails the caller. Errors go to ~/Library/Logs/office-log.err.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { parseArgs, buildEvent } from '../lib/event.mjs';
+import { loadEnv } from '../lib/env.mjs';
+import { postRows } from '../lib/post.mjs';
+
+const ERR = path.join(os.homedir(), 'Library', 'Logs', 'office-log.err');
+
+try {
+  const parsed = parseArgs(process.argv.slice(2));
+  const event = buildEvent(parsed);
+  await postRows(loadEnv(), 'office_events', [event]);
+  if (parsed.cmd === 'start' || parsed.cmd === 'beat') process.stdout.write(event.run_id + '\n');
+} catch (e) {
+  try {
+    fs.mkdirSync(path.dirname(ERR), { recursive: true });
+    const cmd = process.argv[2] ?? '';
+    const agent = process.argv[3] ?? '';
+    fs.appendFileSync(ERR, `${new Date().toISOString()} ${cmd} ${agent} :: ${e.message}\n`);
+  } catch {
+    // never fail the caller, even if logging itself fails
+  }
+}
+process.exitCode = 0;

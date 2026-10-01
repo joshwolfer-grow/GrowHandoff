@@ -1,0 +1,21 @@
+{
+  "_comment": "Live Terros roster cached from POST /user/list. Refresh by re-running the user-list call. Names map to the `owner` column.",
+  "_assignmentColumn": "owner",
+  "_source": "terros /user/list",
+  "reps": {
+    "Aliese Winter": "U.AdzfotF8kZ",
+    "Jackson Patterson": "U.s8ITaRNsfq",
+    "Cooper Felix": "U.5IOFwu4ab5",
+    "Kaimana McGuire": "U.8Vs71iBwhH",
+    "Damian Laudie": "U.KiTVpBspzB",
+    "Esther Mueller": "U.EgIkrOeNsY",
+    "Alaina Fuller": "U.qxl7xY628a",
+    "Isaac Mueller": "U.kziNHYML3T",
+    "Anna Lower": "U.oiDL7DRk_-",
+    "Quaid Rasmussen": "U.E-bC-qMPiE",
+    "Sammi Boyd": "U.ksZEpbYmPt",
+    "Daxton Day": "U.TMc9qK1amN",
+    "Nick Boyd": "U.EKUZef6PpI",
+    "Josh Wolfer": "U.4MTPeFPlcz"
+  }
+}

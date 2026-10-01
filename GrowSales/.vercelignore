@@ -1,0 +1,53 @@
+# Keep these out of the deployed bundle (they'd otherwise be publicly served).
+.vercel
+.env*
+.env.local
+node_modules
+.DS_Store
+.git
+.claude
+
+# Generated at deploy time by buildCommand (see vercel.json) — never upload a stale copy
+public
+
+# Internal data / docs — never publish
+bria
+*.csv
+*.xlsx
+*.jsonl
+api/*.sql
+api/*.md
+
+# The crawl's working set. 766 MB as of Jul 2026 (sr-store.jsonl alone is 232 MB)
+# and none of it is served: the app only fetches team-assignments.json and
+# team-current.json, both of which live at the repo root. Uploading this is what
+# pushed a deploy past Vercel's 10 MB request limit.
+data
+
+# Local safety copies of index.html
+index.html.backup-*
+*.backup-*
+
+# Working notes, not part of the app
+INVENTORY.md
+CLAUDE.md
+
+# Logged-in Chrome profiles used by the crawls. These hold live SESSION COOKIES
+# for SalesRabbit and Amplify — uploading them would publish working logins.
+# They are also ~800 MB, which is what actually blew the 10 MB deploy limit.
+.sr-profile
+.amplify-profile
+.amplify-profile-*
+*-profile
+
+# Local snapshots
+backups
+
+# Older index.html snapshots (2.5 MB of dead weight)
+index.html.bak-*
+.rtr-profile-backfill
+data/_market
+.rtr-profile
+.amplify-profile*
+.slots-profile*
+.sr-profile*

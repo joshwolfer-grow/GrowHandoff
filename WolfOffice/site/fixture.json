@@ -1,0 +1,182 @@
+{
+ "agents": [
+  {
+   "id": "crawler",
+   "floor": "grow",
+   "name": "Crawler",
+   "role": "SalesRabbit sync",
+   "cadence_seconds": 300,
+   "sprite": {
+    "hair": "#4A1B0C",
+    "prop": "net"
+   },
+   "sort": 1,
+   "team": "Ops",
+   "lead": true
+  },
+  {
+   "id": "amplify",
+   "floor": "grow",
+   "name": "Amplify runner",
+   "role": "Amplify sync",
+   "cadence_seconds": 300,
+   "sprite": {
+    "hair": "#2C2C2A",
+    "prop": "bolt"
+   },
+   "sort": 2,
+   "team": "Ops",
+   "lead": false
+  },
+  {
+   "id": "rtr",
+   "floor": "grow",
+   "name": "RTR runner",
+   "role": "RTR sync",
+   "cadence_seconds": 1800,
+   "sprite": {
+    "hair": "#E9B44C",
+    "prop": "scroll"
+   },
+   "sort": 3,
+   "team": "Ops",
+   "lead": false
+  },
+  {
+   "id": "courier",
+   "floor": "grow",
+   "name": "Courier",
+   "role": "ISP lead files",
+   "cadence_seconds": 300,
+   "sprite": {
+    "hair": "#D85A30",
+    "prop": "satchel"
+   },
+   "sort": 4,
+   "team": "Ops",
+   "lead": false
+  },
+  {
+   "id": "exporter",
+   "floor": "grow",
+   "name": "Exporter",
+   "role": "ISP exports and reports",
+   "cadence_seconds": 3600,
+   "sprite": {
+    "hair": "#5F5E5A",
+    "prop": "crate"
+   },
+   "sort": 5,
+   "team": "Ops",
+   "lead": false
+  },
+  {
+   "id": "analyst",
+   "floor": "grow",
+   "name": "Analyst",
+   "role": "Rep and install checks",
+   "cadence_seconds": 86400,
+   "sprite": {
+    "hair": "#2C2C2A",
+    "prop": "ledger"
+   },
+   "sort": 6,
+   "team": "Ops",
+   "lead": false
+  },
+  {
+   "id": "installs",
+   "floor": "grow",
+   "name": "Install watcher",
+   "role": "Booking changes",
+   "cadence_seconds": 86400,
+   "sprite": {
+    "hair": "#E9B44C",
+    "prop": "glass"
+   },
+   "sort": 7,
+   "team": "Ops",
+   "lead": false
+  },
+  {
+   "id": "chaser",
+   "floor": "grow",
+   "name": "Callback chaser",
+   "role": "Unanswered callbacks",
+   "cadence_seconds": 86400,
+   "sprite": {
+    "hair": "#D85A30",
+    "prop": "scroll"
+   },
+   "sort": 8,
+   "team": "Ops",
+   "lead": false
+  }
+ ],
+ "events": [
+  {
+   "agent_id": "crawler",
+   "run_id": "a",
+   "kind": "start",
+   "ok": null,
+   "status": "",
+   "created_at": "NOW-30"
+  },
+  {
+   "agent_id": "amplify",
+   "run_id": "b",
+   "kind": "finish",
+   "ok": true,
+   "status": "Synced 212 knocks",
+   "created_at": "NOW-90"
+  },
+  {
+   "agent_id": "amplify",
+   "run_id": "b0",
+   "kind": "finish",
+   "ok": false,
+   "status": "exit 1",
+   "created_at": "NOW-400"
+  },
+  {
+   "agent_id": "rtr",
+   "run_id": "c",
+   "kind": "finish",
+   "ok": false,
+   "status": "exit 3",
+   "created_at": "NOW-120"
+  },
+  {
+   "agent_id": "courier",
+   "run_id": "d",
+   "kind": "blocked",
+   "ok": null,
+   "status": "i3 file parked, needs a rep",
+   "created_at": "NOW-200"
+  },
+  {
+   "agent_id": "analyst",
+   "run_id": "e1",
+   "kind": "finish",
+   "ok": true,
+   "status": "2 flags: J. Smith books 18d out (team 3-5d)",
+   "created_at": "NOW-3000"
+  },
+  {
+   "agent_id": "installs",
+   "run_id": "e2",
+   "kind": "finish",
+   "ok": true,
+   "status": "1 install pushed, 0 cancelled",
+   "created_at": "NOW-3300"
+  },
+  {
+   "agent_id": "chaser",
+   "run_id": "e3",
+   "kind": "finish",
+   "ok": true,
+   "status": "3 callbacks past 5 days",
+   "created_at": "NOW-3600"
+  }
+ ]
+}

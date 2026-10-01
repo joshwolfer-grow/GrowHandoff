@@ -1,0 +1,92 @@
+{
+  "_comment": "Which ISPs get a knocking workbook, and the Drive folder name for each. Ownership of a DOOR is decided by its SalesRabbit import batch (data/isp-imports.json, kept by scripts/isp-registry.mjs), not by these states/cities: those are only the fallback for rep-created doors in a zip nobody has imported into. See scripts/isp_territory.py. Names match the folders in Drive > Grow - Corporate > Reporting > SalesRabbit Reports For ISPs.",
+  "_editing": "Add a state to a list and the next report picks it up. Nothing to redeploy.",
+  "i3": {
+    "full_name": "i3 Broadband",
+    "states": [
+      "IL"
+    ],
+    "exclude_cities": [
+      "Braceville",
+      "Braidwood",
+      "Coal City",
+      "Diamond",
+      "Wilmington"
+    ],
+    "_note": "Illinois minus Surf's Braidwood-area towns, added Sep 18 2026. Stated as an exclusion so a NEW i3 town still lands on i3's report on its own. If Surf takes another IL town, add it here AND to Surf's cities."
+  },
+  "SLIC": {
+    "full_name": "SLIC Network Solutions",
+    "states": [
+      "NY"
+    ],
+    "total_doors": true
+  },
+  "Glo": {
+    "full_name": "Glo Fiber",
+    "states": [
+      "PA",
+      "VA"
+    ]
+  },
+  "GBN": {
+    "full_name": "GBN",
+    "states": [
+      "IN"
+    ],
+    "exclude_cities": [
+      "Muncie",
+      "Yorktown"
+    ],
+    "_note": "Indiana minus Surf's towns. GBN is Shelbyville / Columbus / Bloomington, quiet since 2026-03-09; Surf started Muncie and Yorktown on 2026-08-25. Stated as an exclusion rather than a city list so a NEW GBN town lands in the report on its own instead of being silently dropped. If Surf takes another Indiana town, add it here AND to Surf's cities."
+  },
+  "Surf": {
+    "full_name": "Surf Internet",
+    "sectors": "map",
+    "states": [
+      "IL",
+      "IN"
+    ],
+    "cities": [
+      "Braceville",
+      "Braidwood",
+      "Coal City",
+      "Diamond",
+      "Muncie",
+      "Wilmington",
+      "Yorktown"
+    ],
+    "_note": "Muncie and Yorktown ONLY, started 2026-08-25. cities and states are ANDed, so the \"IN\" above does not widen this to the state: it is the fence that keeps Yorktown NY (SLIC) and Yorktown VA (Glo) off Surf's report if either ever gets knocked. Shares Indiana with GBN, which carries the matching exclude_cities: add a town here and there together, or the doors get counted on both reports. SalesRabbit holds these as \"Muncie\" and \"Yorktown\"; the match is exact on a lowercased, trimmed city, so a new spelling in SR needs its own entry. Sep 18 2026: Surf also took Braidwood IL and the neighbouring Coal City / Wilmington / Diamond / Braceville doors (batch SR SURF-BRAID). IL is in states and those towns in cities, which are ANDed, so this does not widen Surf to all of Illinois; i3 keeps the rest of IL via its exclude_cities below."
+  },
+  "Lyte": {
+    "full_name": "Lyte Fiber",
+    "states": [
+      "TX"
+    ],
+    "exclude_cities": [
+      "Austin",
+      "Round Rock"
+    ],
+    "_note": "Texas minus Austin and Round Rock, which are Google Fiber."
+  },
+  "GFiber": {
+    "full_name": "Google Fiber",
+    "states": [
+      "MO",
+      "KS"
+    ],
+    "also": [
+      "Austin, TX",
+      "Round Rock, TX"
+    ],
+    "_note": "Missouri and Kansas, plus Austin and Round Rock TX. \"also\" is ORed in on top of states; Lyte carries the matching exclude_cities."
+  },
+  "NLF": {
+    "full_name": "Northern Lights Fiber",
+    "states": [
+      "AB",
+      "Alberta"
+    ],
+    "_note": "Canada, not a US state. SalesRabbit holds the province BOTH ways on these leads: 4,504 doors say \"AB\" and 2,874 say \"Alberta\" (counted 2026-08-21), so both spellings must stay in the list. The filter is an exact uppercased match, not a substring, and trimming this to [\"AB\"] silently drops 39% of the territory. Everything we knock in Canada is Alberta, so this one entry is all of Canada; add a province here if that ever changes."
+  }
+}
