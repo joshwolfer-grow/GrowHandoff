@@ -1,6 +1,6 @@
 # Grow Ops Handoff
 
-As of Oct 21 2026. Written by Josh Wolfer on his last day, then trimmed with him to only what is actually used. The live, shareable copy is the Claude doc "Grow Ops Handoff"; this file is the repo copy.
+As of Oct 21 2026. The live, shareable copy is the Claude doc "Grow Ops Handoff"; this file is the repo copy.
 
 Everything that keeps growsales.vercel.app and the Grow field-ops routines running, written so a successor (or another AI tool) can run it without having built it. The code and the detailed knowledge base live in this repo; this page is the process layer on top. Start here, then `HANDOFF.md` for machine setup, then `docs/knowledge/` for detail.
 
@@ -200,8 +200,6 @@ Tables: `cancel_callbacks`, `callback_leads`, `callback_assign`, `callback_pipel
 
 Other pages that just read the data: Knocking board, Sales by Week, KPIs / Analysis, Markets, Records, Custom Report, Schedule (plus the public `/schedule` form).
 
-**Retired on Oct 21 2026, do not revive:** ISP mailbox watcher (files now arrive by hand), Rep GPS map, the morning-brief bots, weekly rep email and `?snapshot=` page, Meeting board, Standards page, Recruiting board, Roster paste, training pages, merch tool, weekly subs paste, Sequifi roster check, Terros and Time Track imports, training video pipeline, Master Manager Pay and Blitz Sign Up sheet syncs. Earlier retirements: Pronto, Ask Grow, push notifications, Ops/Flags pages, office site, daily manager text, weekly summary, sync watchdog.
-
 **ISP guides and training decks** live in Canva (T-Fiber `DAHUEcj13TE`, Omni `DAHKzf_gLPY`, i3, Grow Playbook v2); the grow-training-deck skill builds new decks in the house style.
 
 ## 9. Access, accounts and secrets
@@ -238,21 +236,3 @@ Login sessions (`data/sr-auth*.json`, `.rtr-profile*/`, `.amplify-profile*/`, `.
 - Cancel Center Texts tab needs a Twilio number with an approved 10DLC campaign.
 - Install availability for i3, SLIC, Omni, Bluepeak, Ezee needs ISP permission; Lyte is impossible.
 - `scripts/meeting-deck-stats.py` hardcodes team rosters; the deck numbers are pulled by SQL instead.
-
-Fixed Oct 21 2026: the two Ezee import batches labeled and the ISP workbook job rerun, the dead `_notify` require stubbed in both Sequifi syncs and deployed, GrowSales committed, crawl-store backup copies and old `.bak` files deleted, rep GPS and the morning-brief bots switched off.
-
-## 11. Last-day checklist for the outgoing owner
-
-The long form is `handoff/BEFORE-YOU-LEAVE.md`. In order:
-
-- [ ] Put every secret in section 9 into a company password manager vault. Most Vercel values cannot be read back, so copy them from where you first got them or rotate them now.
-- [ ] Run `bash handoff/retire-2026-10-21.sh` to park the retired launchd jobs on this Mac.
-- [ ] In Google Sheets, delete the time triggers of the Master Manager Pay and Blitz Sign Up scripts (retired).
-- [x] Refresh the handoff repo from live and commit (done Oct 21). Push it to a company GitHub org and transfer it.
-- [ ] Pack the data: `bash handoff/pack-data.sh` makes `~/Desktop/grow-data-<date>.tar.gz` (customer addresses inside; AirDrop or a restricted Drive link).
-- [ ] Invite the successor as Owner on the Supabase org and the work Vercel team, then remove yourself last.
-- [ ] Google: share the Rep Sales sheet as Editor, have the successor re-create its hourly trigger and redeploy the web app, then update `SHEET_SYNC_URL`. Same for the Ezee Addresses script.
-- [ ] Ask each vendor admin (Sequifi, SalesRabbit main and TDS, Amplify, Opendoor, Surf, Bria, Canva) to issue the successor their own seat.
-- [ ] After the successor's `bash bootstrap.sh verify` is green: rotate the corporate access code, `CRON_SECRET`, `SYNC_TRIGGER_KEY` and `EMAIL_ADMIN_KEY`; revoke your Gmail app password and SalesRabbit tokens.
-- [ ] Stop this Mac's jobs so two machines never crawl at once: `bash ~/Grow/GrowSales/scripts/install-all-agents.sh --remove` and unload the remaining `com.wolfoffice.*` plists.
-- [ ] Remove yourself from Supabase, Vercel and GitHub last.
