@@ -20,14 +20,7 @@ How `api/bria-sync.js` builds it (`buildBriaRoster`):
 ## Who is a sub
 
 - **From week 2026-09-27 (`SUBS_LIST_START`) on: only `rep_flags` `roster_status='sub'` makes a sub, anywhere (KPI, PRA, pay).** No Bria team ≠ sub. Earlier weeks keep the old rule (off every team = sub) so past pay numbers don't move. Deployed Oct 1 2026.
-- **Weekly subs list** (until Bria separates subs): each week the subs list is pasted into chat (lines like "Thomas Shelton (c) (L)", "James Acharte - GHOST", "(Sun-Thur)", "leaves the 2nd"). Process:
-  - Match each name to the EXACT spelling in knocking / deals / bria_sales_daily (`growIsSub` looks up `rep_flags[rep]` by exact, case-sensitive key, e.g. "jaime Butts", "lucas zepeda", "cash Conner"). Ask about any name that does not match confidently.
-  - Upsert `rep_flags` with `is_sub=true`, `roster_status='sub'`, `roster_status_by='weekly subs list'`, annotation in `note`.
-  - Diff against last week's 'weekly subs list' rows; for anyone dropped ASK whether they left or went internal; never clear silently.
-  - The flag is not per week, so it reclassifies the rep's whole history.
-  - Anyone NOT on the list is not a sub (owner, Oct 1 2026). Blaise Churba, Jacob Stenberg, Reuben Dodson marked `internal`.
-  - Oct 1 2026 first list: 16 marked incl. Dallin Cory (removed him from Bria's East Texas team); Mason Brinks had no data yet. Subs seen on the Oct 20 deck: Kyle Camp (Lyte), Mitchell Sallmen / Ethan Smith (Surf IN); James Acharte ("GHOST") carried all 63 i3 report deals in early Oct.
-  - Stop the paste procedure once Bria separates subs itself.
+- **Weekly subs list paste: retired Oct 21 2026.** Subs stay whatever `rep_flags` says today. The rows marked `roster_status_by='weekly subs list'` (Oct 1 to 20 2026: 16 marked on the first list, e.g. Kyle Camp, Mitchell Sallmen, Ethan Smith, James Acharte "GHOST") remain and still hide those reps; `growIsSub` looks up `rep_flags[rep]` by exact, case-sensitive spelling ("jaime Butts", "lucas zepeda"). Change a rep's status from Rep Cards "Not on a team this week" or by editing `rep_flags` directly; anyone without a sub mark is not a sub.
 - `rep_flags.roster_status` ('internal'/'sub'/null) beats every source in both directions; also settable from Rep Cards "Not on a team this week".
 - Known subs: Kyle Camp (confirmed, not in Sequifi), Attia Abdelgawad (flagged Aug 27 2026, zero doors, 223 Aug deals), Parker Seng, Sheltons, Corys, Kohen Springer (marked only from 8/02), Finlinson, Paulsen, Escobar, Hernandez, C. Ramirez, Martin Jr Garcia, Ty Mair, McNair, Samaniego. Many subs were never in Sequifi at all (22 of 27 in Jul 2026), so sub revenue in Sequifi-based numbers is unreliable; their sales partly show only in knocking.
 - Display: subs bucketed as "Subs", included in company totals with a breakdown; Weeks has the Combined/Internal/Subs lens; KPIs are employees only.
@@ -53,13 +46,13 @@ How `api/bria-sync.js` builds it (`buildBriaRoster`):
 
 ## Roster history (how attribution worked before Bria teams)
 
-1. Jul 2026: weekly roster paste (`scripts/parse-week-paste.mjs <file> <sunday>` → `team-current.json` / `team-assignments.json`, deploy). Then Admin › Roster paste → `report_config.__roster_current__` (no deploy). `scripts/roster-import.py <xlsx> [--week] [--write]` parsed the Blitz Sign Up sheet export (row 1 Sunday dates, col A region anchors, block-first name = manager; fill FF00FF = sub, FF0000 = bailed). Manager identity came from the roster, never from Sequifi (Sequifi has no hierarchy).
-2. Aug 17 2026: **Master Manager Pay** sheet = roster of record (pay-owning manager, vs Blitz = team lead knocked under). Full history in `__roster_weeks__` via `scripts/master-pay-sync.gs` or `parse-team-assignments.mjs --push`; `__roster_current__` only for the in-progress week. Master export stalled at 2026-08-09.
+1. Jul 2026: weekly roster paste (`scripts/parse-week-paste.mjs <file> <sunday>` → `team-current.json` / `team-assignments.json`, deploy). Then Admin › Roster paste → `report_config.__roster_current__` (no deploy; the paste page was retired Oct 21 2026). `scripts/roster-import.py <xlsx> [--week] [--write]` parsed the Blitz Sign Up sheet export (row 1 Sunday dates, col A region anchors, block-first name = manager; fill FF00FF = sub, FF0000 = bailed). Manager identity came from the roster, never from Sequifi (Sequifi has no hierarchy).
+2. Aug 17 2026: **Master Manager Pay** sheet = roster of record (pay-owning manager, vs Blitz = team lead knocked under). Full history in `__roster_weeks__` via `master-pay-sync.gs` (retired Oct 21 2026, source removed) or `parse-team-assignments.mjs --push`; `__roster_current__` only for the in-progress week. Master export stalled at 2026-08-09.
 3. Sub marks persisted in `__subs_weeks__` (`_subsWeeksSync`, carry-forward to unmarked weeks) because the Master grid has no Subs bucket.
 4. Sep 10 2026: `api/sequifi-teams-sync.js` (daily cron 45 8 UTC) walks Sundays from 2026-08-09 into `__sequifi_teams__` (refuses empty history, drops empty weeks, `?dry=1`). `_authMgr` exact-week Sequifi for weeks ≥ `_SEQ_START`. Sep 15: `_seqCarryMgr` places a rep on the nearest Sequifi team within 3 weeks back / 2 ahead (Sequifi rosters drop people week to week).
 5. Sep 29 2026: Bria teams (above). The carry-forward logic is reused unchanged.
 
-`deals.manager` is dead ('Unassigned' since Aug 16 2026); query the roster stores instead. Rep→manager must always be resolved per week (a time-invariant map left ~36% of a week unattributed). Fix Attribution screen and `rep_manager_overrides` are retired. The Sequifi teams sync still runs (08:45 UTC cron; note it still requires the retired `_notify.js`, see syncs-and-schedules.md).
+`deals.manager` is dead ('Unassigned' since Aug 16 2026); query the roster stores instead. Rep→manager must always be resolved per week (a time-invariant map left ~36% of a week unattributed). Fix Attribution screen and `rep_manager_overrides` are retired. The Sequifi teams sync still runs (08:45 UTC cron).
 
 ## Managers and markets seen in Sep 2026 (for orientation; verify current; Oct blitz groups are listed above)
 

@@ -30,7 +30,7 @@
 - Doors per sale pools raw doors ÷ raw sales over the window (never average weekly ratios). Under 8 sales, prefix "~" (dashboard) or "still settling" (email).
 - Averages are per rep DAY WORKED; sales-only rows (doors=0, sold>0) count in total sold but never in days out (a date counts as a day out only when doors > 0).
 - Vacants are excluded from ISP report denominators ("knockable doors"); 60% lifetime contact rate is the ISP-report goal.
-- Meeting "AVG DOORS / DAY" = team doors ÷ rep-days over 10 doors. Meeting board door bar `MEET_DOOR_BAR` = 60 (Sep 8 2026; median worked day was 61).
+- Meeting "AVG DOORS / DAY" = team doors ÷ rep-days over 10 doors. (The in-app Meeting board and its 60-door bar were retired Oct 21 2026.)
 
 ## Install rates (two named metrics, always shown as a pair)
 
@@ -41,7 +41,6 @@
 - **Presale is out of the install side** of the KPI page (still counts in sales/PRA/close). **Lyte ghost presales** (Pending with no install date, `_kwGhostPresale`, regex `^lyte`) are excluded from the install side everywhere the presale filter runs; cancels kept. Lyte 2026 IR 65.3% → 87.4%. Same shape exists at Ezee (687), TDS (253), i3 (178), deliberately not swept up (one-line regex change).
 - **Projected IR** (weekly email recap): `(inst + pend*r) / (inst + canc + pend)`, r = settle rate from cohorts sold 5+ weeks back (per manager with ≥25 resolved matured deals, else company; company r = 0.769 in Jul 2026). Standard deals only.
 - Meeting deck install rate = CURRENT month-to-date Completed IR by ISP+state; pending presales not counted as installed (tried Sep 15 2026, Ezee jumped 72.3% → 95.2%, rejected). Show PENDING when a market has zero resolved.
-- Meeting board install rate = PRIOR month Completed IR for the team's reps.
 - Days to install = sale → install date. Booking lag = sale → planned_install (`Df 'pd'`).
 
 ## KPI page (Sales / Knocking / Bonus lenses)
@@ -62,11 +61,11 @@
 Implementation: `growBriaIndex()` / `growBriaWeek()` / `growBriaRepOk()` in index.html; Bria carries only rep + date, so manager/ISP scoping is resolved per rep per WEEK via `growBriaMgrOf` (falls back to the roster `_authMgr` when the deal feed says Unassigned) / `growBriaIspOf`. Every table falls back to install-report numbers when Bria has no rows for a week. `_praUnionWorked` also clips knocked days past `_kwSalesThru()` and inside `_kwThruHoles()`. Intake accounts (Nick Boyd, Daxton Day) are dropped from `knocking_daily` at ingest via `window.GROW_INTAKE` (their deals kept).
 
 
-- Weeks / Overview Sold tile / leaderboards / Markets current week / Meeting board deals / knock board sold: Bria.
+- Weeks / leaderboards / Markets current week / knock board sold: Bria.
 - Weeks Inst/Canc/IR/booking: install report.
 - KPI page: install report + Bria fill past coverage.
 - Records "All Reps" leaderboard: Sold + PRA from Bria YTD (`_BRIA_YTD_START` 2026-01-01), installs from the deal feed (Serviced), joined by exact name. Leaderboard Club milestones (10/12/16/20 a day, 30/40/50/60 a week) from Bria all-time (back to 2025-02-17); Install Records stay on the deal feed.
 - Markets page settled weeks: deals feed (so market rows sum); current week from Bria with market inferred from the rep's last reported market. Market = ISP + state; Deals/Rep, never PRA.
 - Meeting deck: per day, install report up to that ISP's latest reported sale_date this week, then new Bria for the days after.
 - Upfront pay: one source per rep per Sunday blitz week (report if any, else Bria).
-- Daily manager card: Bria only for sold.
+- Daily manager card (retired Oct 14) and weekly rep email (retired Oct 21): Bria only for sold / report + Bria max; history only.

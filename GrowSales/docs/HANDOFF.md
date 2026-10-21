@@ -1,6 +1,6 @@
 # GrowSales Handoff
 
-Everything you need to build on top of the GrowSales stack: what the pieces are, every connection and endpoint, where the credentials live, and what to search for when you're looking for something. Prepared Aug 2026.
+Everything you need to build on top of the GrowSales stack: what the pieces are, every connection and endpoint, where the credentials live, and what to search for when you're looking for something. Prepared Aug 2026; trimmed Oct 21 2026 (Pronto, web push, the weekly rep email, Geocodio and the Master Manager Pay script are retired; see `../../docs/knowledge/`).
 
 ---
 
@@ -67,7 +67,6 @@ All under `https://growsales.vercel.app/api/…`. The syncs authenticate with a 
 | `/api/bria-sync` | 09:00 daily | Bria → `bria_sales_daily`, `bria_deals`, `bria_reps` |
 | `/api/sync-watchdog` | 10:00 daily | Verifies the three syncs ran; push-alerts if not |
 | `/api/weekly-summary` | 14:00 Mondays | Weekly digest |
-| `/api/weekly-rep-email` | manual | Per-rep snapshot email, fired from the control panel |
 | `/api/sheet-sync` | manual | "Sync now" button for the Rep Sales Google Sheet |
 | `/api/vapid-public-key`, subscribe/send-push | — | Web-push plumbing for the dashboard's notifications |
 
@@ -80,8 +79,6 @@ The whole app is one file: `index.html` at the repo root (~1.2 MB; `public/` is 
 | URL | Shows |
 |---|---|
 | `growsales.vercel.app` | Main dashboard (36 screens via the sidebar) |
-| `?rep=<name>` | A rep's personal view |
-| `?snapshot=<rep>` | The canonical weekly rep snapshot, the same page embedded in the rep/manager/corporate emails |
 | Admin › Ops | The Automations board: one row per pipeline, green when it ran recently, red rows name the fix command. The first place to look when data seems stale. |
 
 ## 5. Upstream systems and credentials
@@ -98,9 +95,8 @@ Two secret stores, deliberately separate: **Vercel project env** feeds `api/*`; 
 | **SalesRabbit** (door app) | `knocking` / `knock_events` via crawl | `SALESRABBIT_API_KEY` + live bearer in `data/sr-auth.json` |
 | **Amplify** (TDS company) | `knocking` (`source=tds`) | Cookie-auth only, a Chrome profile in `.amplify-profile*/`. No working API key. |
 | **Opendoor/Ezee portal** (RTR hours) | `knocking` hours | SSO session in `.rtr-profile*/`; expires on its own schedule |
-| **Google Sheets** (Rep Sales, Master Manager Pay) | roster + pay truth | Apps Script webhooks; `SHEET_SYNC_URL`/`SHEET_SYNC_KEY`. Scripts live in Google, copies in `scripts/*.gs`. |
-| **Gmail** (email sends) | weekly emails, alerts | `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `EMAIL_ADMIN_KEY` |
-| **Geocodio** | address → lat/lng imports | API key in `.env.local` |
+| **Google Sheets** (Rep Sales) | deals feed | Apps Script webhooks; `SHEET_SYNC_URL`/`SHEET_SYNC_KEY`. Scripts live in Google, copies in `scripts/*.gs`. |
+| **Gmail** (email sends) | login codes, alerts | `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `EMAIL_ADMIN_KEY` |
 | **Web push** | dashboard notifications | `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` |
 
 > **None of these secret values are in this document or in git.** Whatever you need, get from Josh directly through a password manager. Most likely you only need the read-only Supabase key from §2.

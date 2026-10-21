@@ -109,7 +109,6 @@ MBS = CDG Portal behind Surf (`surfinternet.cdgportal.com`, company 0160), Okta 
 
 ## Other vendors
 
-- **Terros** (door CRM used for some leads): API key in `~/.terros.env` on the old Mac, header `Authorization: ApiKey <key>`, all endpoints POST. `scripts/geocode-file.mjs --terros --rep "Name"` then `scripts/push-to-terros.mjs`: `/import/add` (entity=Account, disableGeocoding=true, addMissingUsers=false, createCustomLocations=true) → PUT CSV to S3 URL → poll `/import/get` → `/import/errors`; undo with `/import/cleanup`. Rep name→userId via `/user/list` cached in `data/terros-reps.json` (companyId `C.DAOJaKdk`); assignment goes in `owner`; good field set street, city, state, zip, latitude, longitude, owner, stage=Lead. Manual by design (terros-import skill).
-- **Geocodio** ($1/1k, 2,500/day free) key in `~/.geocodio.env`. Beat Smarty (88.9% vs 76% rooftop). Bad pins come from bad source addresses; judge by `accuracy_type`, not suffix rewrites. `~/Downloads` was TCC-blocked; copy files into `data/` first.
-- **Gmail SMTP** (`GMAIL_USER`, `GMAIL_APP_PASSWORD`) sends the weekly emails and email-login codes, the local crawler failure emails (`alert-email.py`, creds in `.env.prod`), and the same mailbox is read (IMAP) by `mail-leads-pull.py`. All tied to the owner's Workspace account.
+- **Terros** (door CRM) and **Geocodio** (geocoding for Terros pushes): retired Oct 21 2026, keys not handed over; `scripts/geocode-file.mjs` / `push-to-terros.mjs` stay for history only.
+- **Gmail SMTP** (`GMAIL_USER`, `GMAIL_APP_PASSWORD`) sends the email-login codes and the local crawler failure emails (`alert-email.py`, creds in `.env.prod`). Tied to the owner's Workspace account. The weekly rep emails and the IMAP mailbox watcher (`mail-leads-pull.py`) were retired Oct 21 2026.
 - **Google Drive** for ISP workbooks, raw lead archives, audit sheets.

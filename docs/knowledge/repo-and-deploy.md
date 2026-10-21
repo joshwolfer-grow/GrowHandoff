@@ -5,9 +5,8 @@
 | Handoff path | Was on the old Mac | What |
 |---|---|---|
 | `GrowSales/` | `~/Grow/GrowSales` | The dashboard (`index.html`), `api/` (Vercel serverless), `scripts/` (syncs, ISP tooling), `supabase/`, `data/` |
-| `WolfOffice/` | `~/WolfOffice` | Local "office" site + launchd workers (only Grow workers matter now) |
-| `RepText/` | `~/Grow/RepText` | iMessage group texting helpers for the daily manager cards |
-| `TrainingVideos/` | `~/Grow/TrainingVideos` | Video editing pipeline + training decks |
+| `WolfOffice/` | `~/WolfOffice` | The task bots (runner-grow, slots-tds, slots-surf); the rest of the folder is retired (see task-bots.md) |
+| `RepText/` | `~/Grow/RepText` | iMessage group texting helpers |
 
 Absolute paths like `/Users/joshuawolfer/...` will not exist on a new machine. History: sessions used to open in `~/Desktop/Grow/GrowSales`, a near-empty stray (symlink/old partial copy without `scripts/`); the real repo was always `~/Grow/GrowSales`. `vercel --prod` from the stray shipped an EMPTY deploy. The move off Desktop (Aug 2026) also broke every launchd plist that hardcoded the Desktop path (Aug 8 to 10 2026).
 
@@ -16,7 +15,7 @@ Machine-specific paths referenced elsewhere (recreate on the new machine): `~/Li
 ## Deploying GrowSales
 
 - `vercel --prod --yes` from `GrowSales/`. Vercel deploys the **working directory, not git**. That is how ~30 `api/` and `scripts/` files ran in prod for months while untracked. Commit before deploying so live and git match.
-- `vercel.json` buildCommand is `bash build.sh` (a file because of a 256-char limit). `build.sh` copies root `index.html`, `sw.js`, `manifest.json`, icons, `apply.html`, `schedule.html`, `calculator.html` (added Sep 29), `training.html`, `maps/view.html` into `public/` (`outputDirectory: "public"`). It also publishes `scripts/*` and `_name-aliases.js` to `/scripts/*` (plus `anon-key.txt`) and deletes `install-slots.mjs` from `public/scripts` so the bot is never published. **Never edit or recreate a local `public/`**; it is build-generated and git/vercel-ignored (since Jul 16 2026).
+- `vercel.json` buildCommand is `bash build.sh` (a file because of a 256-char limit). `build.sh` copies root `index.html`, `sw.js`, `manifest.json`, icons, `schedule.html`, `maps/view.html` (and the retired `apply.html`, `calculator.html`, `training.html`, `money.html`, `quiz.html`, `maps/reps.html`, harmless to keep copying) into `public/` (`outputDirectory: "public"`). It also publishes `scripts/*` and `_name-aliases.js` to `/scripts/*` (plus `anon-key.txt`) and deletes `install-slots.mjs` from `public/scripts` so the bot is never published. **Never edit or recreate a local `public/`**; it is build-generated and git/vercel-ignored (since Jul 16 2026).
 - Preview URLs are behind Vercel SSO (curl gets 302). Verify builds locally with `vercel build` and inspect `.vercel/output/static/`.
 - Alias is `growsales.vercel.app` (not `grow-sales`, which 404s DEPLOYMENT_NOT_FOUND).
 - `.vercelignore` must exclude `data`, `*.jsonl`, every Chrome profile dir (`.rtr-profile*`, `.amplify-profile*`, `.sr-profile*`), `leads_export-*.csv`, `.xlsx`, `bria/`, `.claude`, `api/*.sql`, `api/*.md`. Before Jul 29 2026 deploys tried to upload 852 MB including live session cookies (limit 10 MB). A deploy that uploaded a copied profile burned Vercel's 5000 files/day upload cap (Oct 1 2026).
@@ -37,7 +36,7 @@ Machine-specific paths referenced elsewhere (recreate on the new machine): `~/Li
 
 - **Grow Sales DB:** project ref `cmkfohwbejcztctrpdnt` (anon URL + key at the top of `index.html`; most tables have anon read). Free plan; see dashboard-app.md for the egress fix.
 - **New Bria (read only):** `oofisagqyhfcpmfmcjwt` (see data-sources.md).
-- **Wolf Office:** `hydnqquciomyfuntavhr` (rebuilt Oct 1 2026, see wolfoffice.md).
+- **Wolf Office:** `hydnqquciomyfuntavhr` (rebuilt Oct 1 2026, unused since Oct 14; the office tables live in the Grow Sales project, see task-bots.md).
 - Grow schema `backup` holds dated snapshots (`*_20260911` Bria tables, `upfront_paid_20260917`), anon revoked.
 
 ## Local testing
@@ -46,7 +45,7 @@ Machine-specific paths referenced elsewhere (recreate on the new machine): `~/Li
 - Browsers serve cached `index.html`; add `&cb=<n>` or you test the old build.
 - Browser-pane screenshots go blank when hidden; verify via DOM text.
 - Old Mac constraints (8 GB RAM, Desktop on iCloud) caused folder-picker hangs and 0-byte "dataless" files; keep the repo out of iCloud-synced folders on the new machine.
-- **New Mac (Oct 2026):** `bash scripts/install-all-agents.sh` installs the GrowSales launchd agents and the WolfOffice workers together (see syncs-and-schedules.md for the live list). Unloaded plists are parked in `~/Library/LaunchAgents/disabled-grow/`, not deleted.
-- **Retired API files** live in `GrowSales/backups/api-retired-20261014/` (`sync-watchdog.js`, `weekly-summary.js`, `vapid-public-key.js`, `_notify.js`); two live syncs still require `_notify.js` (see syncs-and-schedules.md). `vercel.json` crons list only bria-sync, sequifi-sync, sequifi-teams-sync.
-- Extra pages copied by build.sh since Oct 2026: `sources.js`, `money.html`, `quiz.html`, `calculator.html`, `maps/reps.html`, `maps/view.html`.
-- State on Oct 21 2026: 20 modified and 5 deleted files uncommitted on main (the deletions of ask / pronto / push endpoints are intentional); prod matches disk, not git.
+- **New Mac (Oct 2026):** `bash scripts/install-all-agents.sh` installs the GrowSales launchd agents and the task bots together (see syncs-and-schedules.md for the live list). Unloaded plists are parked in `~/Library/LaunchAgents/disabled-grow/`, not deleted.
+- **Retired API files** live in `GrowSales/backups/api-retired-20261014/` (`sync-watchdog.js`, `weekly-summary.js`, `vapid-public-key.js`, `_notify.js`); the live syncs carry a stub for `_notify.js` since Oct 21. `vercel.json` crons list only bria-sync, sequifi-sync, sequifi-teams-sync.
+- Extra files copied by build.sh since Oct 2026: `sources.js`, `maps/view.html` (plus the retired training pages and `maps/reps.html`).
+- State on Oct 21 2026: GrowSales committed and deployed that day, so prod, disk and git match.

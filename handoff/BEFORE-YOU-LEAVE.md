@@ -14,14 +14,16 @@ Create a shared vault (1Password / Bitwarden, company-owned) and save:
 
 | Where it lives now | Names |
 |---|---|
-| Vercel project env (copy from wherever you first got each value) | SUPABASE_SERVICE_KEY, CRON_SECRET, SYNC_TRIGGER_KEY, SEQUIFI_TOKEN, BRIA_SUPABASE_PUBLISHABLE_KEY, BRIA_SUPABASE_READONLY_KEY, GMAIL_APP_PASSWORD, EMAIL_ADMIN_KEY, SHEET_SYNC_KEY, SHEET_SYNC_URL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, PUSH_AUTH_KEY, META_APP_SECRET, META_PAGE_TOKEN, META_VERIFY_TOKEN, RECRUIT_INTAKE_KEY |
+| Vercel project env (copy from wherever you first got each value) | SUPABASE_SERVICE_KEY, CRON_SECRET, SYNC_TRIGGER_KEY, SEQUIFI_TOKEN, BRIA_SUPABASE_PUBLISHABLE_KEY, BRIA_SUPABASE_READONLY_KEY, GMAIL_APP_PASSWORD, EMAIL_ADMIN_KEY, SHEET_SYNC_KEY, SHEET_SYNC_URL |
 | `GrowSales/.env.local`, `.env.prod`, `.env.bria`, `.env.install-slots` | SALESRABBIT_API_KEY, SR_ACCOUNT_KEY, SR_SALESRABBIT_KEY, GMAIL_USER, GMAIL_APP_PASSWORD, BRIA_*, SURF_USER_ID, SURF_PIN |
 | `GrowSales/data/.sector-map-key` | sector_maps write key |
-| `~/.geocodio.env`, `~/.terros.env` | GEOCODIO_API_KEY, TERROS_API_KEY |
 | `~/Grow/RepText/.env` | GROW_ACCESS_CODE |
-| `~/Grow/TrainingVideos/.env` | PEXELS_API_KEY, GEMINI_API_KEY |
-| `~/Grow/WolfOffice/.env` (if WolfOffice is kept) | OFFICE_SUPABASE_URL, OFFICE_SERVICE_KEY |
-| Apps Script > Project Settings > Script Properties (each script) | SUPABASE_KEY, WEB_TRIGGER_KEY, the onboarding script's Sequifi token |
+| `~/WolfOffice/.env` | OFFICE_SUPABASE_URL, OFFICE_SERVICE_KEY (task bots) |
+| Apps Script > Project Settings > Script Properties (Rep Sales sync, Ezee Addresses, onboarding) | SUPABASE_KEY, WEB_TRIGGER_KEY, the onboarding script's Sequifi token |
+
+Retired Oct 21 2026 and NOT needed in the vault: Geocodio, Terros, Meta
+lead-ads tokens (META_*, RECRUIT_INTAKE_KEY), Pexels, Gemini, the web-push
+VAPID/PUSH keys. Revoke them where you can.
 
 Login-session files (`data/sr-auth*.json`, browser profiles) do **not** go in
 the vault. They are tied to your login and the successor re-creates them with
@@ -31,28 +33,23 @@ their own (`bash bootstrap.sh logins`).
 
 | Account | Today | Do this |
 |---|---|---|
-| **Supabase** org "josh.wolfer@growmarketing.biz's Org" (Grow Sales `cmkfohwbejcztctrpdnt`, Wolf Office `hydnqquciomyfuntavhr`) | Owned by you | Invite the successor as **Owner**, rename the org to something like "Grow", then remove yourself last |
+| **Supabase** org "josh.wolfer@growmarketing.biz's Org" (Grow Sales `cmkfohwbejcztctrpdnt`; the unused Wolf Office project `hydnqquciomyfuntavhr` can be deleted) | Owned by you | Invite the successor as **Owner**, rename the org to something like "Grow", then remove yourself last |
 | **Vercel** team `joshwolfer-8879s-projects`, project serving growsales.vercel.app | Owned by you | Invite successor as **Owner**, rename the team, remove yourself last. (Your personal Vercel account cannot see it; use the work login) |
 | **GitHub** `joshwolfer-grow` | Your account | Push the handoff repo there (or to a company org) and **transfer** it to the successor or the org: Settings > Transfer |
-| **Google Apps Script** (Rep Sales sync, master-pay-sync, roster-sync, timetrack-backfill, "Automated Onboarding" `processNewHires`) | Run as you; **triggers die when your account is suspended** | Share each bound Sheet with the successor as Editor, have them make a copy or transfer ownership, recreate the time triggers under their account, redeploy the Rep Sales web app as them (its URL changes, so update `SHEET_SYNC_URL` in Vercel). **Export the onboarding script source into `GrowSales/scripts/`**: it exists nowhere else |
+| **Google Apps Script** (Rep Sales sync, Ezee Addresses, "Automated Onboarding" `processNewHires`) | Run as you; **triggers die when your account is suspended** | Share each bound Sheet with the successor as Editor, have them make a copy or transfer ownership, recreate the time triggers under their account, redeploy the Rep Sales web app as them (its URL changes, so update `SHEET_SYNC_URL` in Vercel). **Export the onboarding script source into `GrowSales/scripts/`**: it exists nowhere else. master-pay-sync and roster-sync are retired (step 6 deletes their triggers) |
 | **Google Drive** shared drive "Grow - Corporate" | Member | Make sure the successor is a member (Content manager) |
-| **Gmail**: login codes, rep emails, and ISP lead intake all use your mailbox and app password | Yours | Create a shared mailbox (e.g. reports@growmarketing.biz) + app password, put it in Vercel `GMAIL_USER`/`GMAIL_APP_PASSWORD` and `.env.prod`, tell ISPs / Daxton / Nick the new address, then revoke your app password |
+| **Gmail**: login codes and crawler failure emails use your mailbox and app password | Yours | Create a shared mailbox (e.g. reports@growmarketing.biz) + app password, put it in Vercel `GMAIL_USER`/`GMAIL_APP_PASSWORD` and `.env.prod`, then revoke your app password. ISP lead files now arrive by hand, so no mailbox watcher needs re-pointing |
 | **Sequifi** API token (~60-day expiry) | Your admin seat | Successor needs an admin seat and mints their own token. Update Vercel `SEQUIFI_TOKEN` and the onboarding script property |
 | **SalesRabbit** (main + TDS tenant), **Amplify**, **Opendoor/RTR** portals (Ezee, Bluepeak, Omni), **Surf** portal | Your logins | Ask each admin / ISP contact to issue the successor a seat |
 | **Bria** (new) read-only key | Company-to-company | Tell the Bria owner who the new contact is |
-| **Canva** (training decks, meeting deck, T-Fiber guide) | Your seat | Move designs and folders to a company Canva team, add the successor |
-| **Terros**, **Geocodio**, **Pexels**, **Gemini** keys | Issued to you | Successor gets their own (Terros via its admin) |
-| **Meta** lead-ads page token (Recruiting board) | Whoever connected the Page | Re-auth under a company Business Manager admin |
+| **Canva** (training decks, meeting deck, ISP guides) | Your seat | Move designs and folders to a company Canva team, add the successor |
 | **Claude** connectors (Supabase, Canva, Chrome) and the claude.ai skills `grow-training-deck`, `leads-dedup` | Your Claude account | Skills are already copied into this repo. Successor connects their own connectors |
 
-## 3. Decide two jobs that send as you ★
+## 3. The job that sends as you ★
 
-- **mgrcards** (the 9 AM "Daily Report: <Manager>" texts) sends from **your
-  iMessage**, needs hand-made group chats, and has never delivered reliably.
-  Pick one: retire it, or have the successor rebuild it on their own Apple ID.
-  Either way, **unload it on your Mac on your last day** (step 6) so it stops
-  trying to text from your number.
-- **mail-leads** reads **your** inbox. It moves to the shared mailbox in step 2.
+**mgrcards** (the 9 AM "Daily Report: <Manager>" texts) sent from **your
+iMessage** and was unloaded Oct 14. Make sure it stays unloaded on your last
+day (step 6) so it never tries to text from your number again.
 
 ## 4. Get the code current
 
@@ -67,11 +64,16 @@ since Oct 1 2026 is only in your Claude memory until then.
     bash ~/Grow/GrowHandoff/handoff/pack-data.sh           # ~/Desktop/grow-data-<date>.tar.gz
 
 AirDrop it, or use a **restricted** Drive link (it holds customer addresses).
-TrainingVideos footage/assets/work/output (~9 GB): copy the folders to a
-shared Drive folder.
 
 ## 6. Last day, after the successor's `bootstrap.sh verify` is green
 
+- Park the retired launchd jobs (mailbox watcher, morning brief task bots):
+
+      bash ~/Grow/GrowHandoff/handoff/retire-2026-10-21.sh
+
+- Delete the Apps Script triggers for **master-pay-sync** (Master Manager Pay
+  sheet, `mphPush`) and **roster-sync** (Blitz Sign Up sheet, "Grow Roster"
+  menu) in their sheets' script editors (Triggers panel). Both are retired.
 - Rotate the corporate dashboard access code: the current one is in your
   `~/Library/Logs/wolfoffice/mgrcards.log` in plain text. Revoke your own
   access codes in Admin > Access.

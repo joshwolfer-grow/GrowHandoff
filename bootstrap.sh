@@ -7,9 +7,8 @@
 #   bash bootstrap.sh install            # npm + pip deps, skills, env file templates
 #   bash bootstrap.sh data <archive>     # unpack the grow-data-*.tar.gz from the previous owner
 #   bash bootstrap.sh logins             # prints the sign-in steps (each opens a browser)
-#   bash bootstrap.sh jobs               # install the 7 scheduled launchd jobs
+#   bash bootstrap.sh jobs               # install the 6 scheduled launchd jobs + the 3 task bots
 #   bash bootstrap.sh verify             # health check of jobs, tokens, Drive, Vercel
-#   bash bootstrap.sh wolfoffice         # OPTIONAL: the WolfOffice status layer
 set -uo pipefail
 G="$HOME/Grow"
 GS="$G/GrowSales"
@@ -48,10 +47,9 @@ step_check() {
   echo
   echo "== Secrets present (values not shown)"
   for f in GrowSales/.env.local GrowSales/.env.prod GrowSales/.env.bria GrowSales/.env.install-slots \
-           RepText/.env TrainingVideos/.env GrowSales/data/.sector-map-key GrowSales/data/.sequifi-token; do
+           RepText/.env GrowSales/data/.sector-map-key GrowSales/data/.sequifi-token; do
     [ -s "$G/$f" ] && ok "$f" || warn "$f not filled in yet (see GrowSales/.env.example)"
   done
-  for f in .geocodio.env .terros.env; do [ -s "$HOME/$f" ] && ok "~/$f" || warn "~/$f not filled in yet"; done
   echo
   [ $MISSING = 0 ] && echo "All required tools present." || echo "Install the MISSING items, then re-run: bash bootstrap.sh check"
 }
@@ -71,7 +69,6 @@ step_install() {
     [ -e "$GS/$f" ] && ok "GrowSales/$f exists" || { : > "$GS/$f"; warn "created empty GrowSales/$f"; }
   done
   [ -e "$G/RepText/.env" ] || { echo 'GROW_ACCESS_CODE=' > "$G/RepText/.env"; warn "created RepText/.env"; }
-  [ -e "$G/TrainingVideos/.env" ] || { printf 'PEXELS_API_KEY=\nGEMINI_API_KEY=\nGEMINI_IMAGE_MODEL=\n' > "$G/TrainingVideos/.env"; warn "created TrainingVideos/.env"; }
   mkdir -p "$GS/imports/done" "$GS/imports/isp" "$GS/data"
   echo
   echo "Next: put the values in (GrowSales/.env.example says which name goes in which file),"
@@ -108,6 +105,9 @@ EOF
 }
 
 step_jobs() {
+  # 6 GrowSales agents (sr-sync, amplify-sync, rtr-sync, isp-export, isp-intake, ezee-addresses)
+  # plus the 3 task bots (runner-grow, slots-tds, slots-surf). mail-leads and the Time Track
+  # agents were retired Oct 21 2026; their plists are gone from scripts/launchd/.
   NB="$(node_bin)"; export PATH="$(dirname "$NB"):$PATH"
   bash "$GS/scripts/install-all-agents.sh" --dry-run >/dev/null || { echo "dry run failed"; exit 1; }
   bash "$GS/scripts/install-all-agents.sh"
@@ -121,7 +121,7 @@ step_verify() {
   echo; echo "== Tokens"
   [ -s "$GS/data/sr-auth.json" ] && ok "SalesRabbit token" || miss "SalesRabbit token: node scripts/grow-sync.mjs --seed"
   echo; echo "== Last sync log lines"
-  for l in sr-sync rtr-sync amplify-sync isp-export isp-intake; do
+  for l in sr-sync rtr-sync amplify-sync isp-export isp-intake ezee-addresses; do
     f="$GS/imports/done/$l.log"; [ -f "$f" ] && echo "  $l: $(tail -1 "$f" | cut -c1-120)" || warn "$l: no log yet"
   done
   echo; echo "== Vercel"
@@ -130,15 +130,8 @@ step_verify() {
   echo; echo "Also open the dashboard > More > Admin > health board: every row should be green within a day."
 }
 
-step_wolfoffice() {
-  echo "WolfOffice is optional: the GrowSales jobs run without it."
-  echo "Read WolfOffice/README.md first, then:"
-  echo "  cd ~/Grow/WolfOffice && npm ci && cp .env.example .env   # fill OFFICE_SUPABASE_URL / OFFICE_SERVICE_KEY"
-  echo "  bash bin/install-workers.sh --dry-run    # check, then without --dry-run"
-}
-
 case "${1:-}" in
   check) step_check;; install) step_install;; data) step_data "${2:-}";;
-  logins) step_logins;; jobs) step_jobs;; verify) step_verify;; wolfoffice) step_wolfoffice;;
+  logins) step_logins;; jobs) step_jobs;; verify) step_verify;;
   *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//';;
 esac

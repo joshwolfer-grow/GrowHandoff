@@ -19,7 +19,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.." || exit 1
 ROOT="$(pwd)"
 LA="$HOME/Library/LaunchAgents"
-ALL=(sr-sync amplify-sync rtr-sync isp-export isp-intake mail-leads timetrack-import)
+ALL=(sr-sync amplify-sync rtr-sync isp-export isp-intake ezee-addresses)
 
 NODE_BIN="$(command -v node || true)"
 [ -z "$NODE_BIN" ] && NODE_BIN="$(ls -d "$HOME"/.nvm/versions/node/*/bin/node 2>/dev/null | sort -V | tail -1)"

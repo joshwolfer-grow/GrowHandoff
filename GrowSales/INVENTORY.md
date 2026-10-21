@@ -1,7 +1,10 @@
 # GrowSales — what exists
 
-Inventory as of Jul 28 2026. Grouped by how it runs, because that's what
-determines whether it can rot silently.
+Inventory as of Jul 28 2026, kept for history. Grouped by how it runs, because that's what
+determines whether it can rot silently. **What actually runs today is in `../HANDOFF.md`
+and `../docs/knowledge/syncs-and-schedules.md`**; Time Track imports, Geocodio, Terros,
+Ask Grow, Pronto, web push, the weekly rep email and the watchdog/summary crons below were
+all retired by Oct 21 2026.
 
 ---
 
@@ -22,8 +25,7 @@ These are the reliable tier. If something must not be forgotten, it belongs here
 | When | Job | State |
 |---|---|---|
 | 07:15 daily | `com.grow.amplify-knocking` → `run-amplify-sync.sh` → `amplify-knocking-sync.mjs` | **BROKEN (exit 126) and should be removed** — see Cleanup |
-| — | `com.grow.timetrack-import` → `run-timetrack-scan.sh` | **BROKEN (exit 78)** — plist still says `REPLACE_HOME`, never substituted |
-| 09:00 weekdays | `com.grow.timetrack-reminder` | Notification telling you to download the Time Track report |
+| — | `com.grow.timetrack-import`, `com.grow.timetrack-reminder` | retired Oct 21 2026 (plist templates removed) |
 
 ## 3. Manual — the daily knock system (built Jul 28)
 
@@ -38,12 +40,10 @@ These are the reliable tier. If something must not be forgotten, it belongs here
 
 | Script | Does |
 |---|---|
-| `scripts/import-timetrack.mjs` | Time Track xlsx → `knocking` (`method=timetrack`). Real clock hours, which the crawl can't produce |
-| `scripts/harvest-timetrack-mail.mjs` | Pulls the Time Track report out of email |
+| `scripts/import-timetrack.mjs`, `harvest-timetrack-mail.mjs` | Time Track imports, retired Oct 21 2026 |
 | `scripts/sr-lead-history.mjs` | Full ~40-min SalesRabbit crawl. Fallback if `sr-store.jsonl` is ever lost |
 | `scripts/amplify-company-sync.mjs` | TDS (second company on Amplify) → `knocking` (`method=amplify`, `source=tds`) |
-| `scripts/geocode-file.mjs` | Geocodio address → lat/lng |
-| `scripts/push-to-terros.mjs` | Terros upload |
+| `scripts/geocode-file.mjs`, `push-to-terros.mjs` | Geocodio / Terros, retired Oct 21 2026 |
 | `scripts/parse-week-paste.mjs`, `parse-team-assignments.mjs` | Turn pasted schedules into structured data |
 | `scripts/index-content.mjs` | Builds the Ask Grow search index (`doc_chunks`) |
 | `scripts/build_guide_site.py` | ISP field guide site |
@@ -59,7 +59,7 @@ notifications · pushNotify · shareLinks · sheetSync
 
 Plus Ask Grow (`api/ask.js`), push notifications (`api/send-push.js`,
 `subscribe.js`, `vapid-public-key.js`), the manual rep email
-(`api/weekly-rep-email.js`) and the Rep Sales sheet button (`api/sheet-sync.js`).
+(`api/weekly-rep-email.js`, retired Oct 21 2026) and the Rep Sales sheet button (`api/sheet-sync.js`).
 
 ## 6. Supabase tables
 
@@ -80,9 +80,7 @@ reason it hasn't already re-poisoned the table. Unload it:
 
     launchctl unload ~/Library/LaunchAgents/com.grow.amplify-knocking.plist
 
-**2. Fix or delete `com.grow.timetrack-import`.** Its plist still contains the
-literal string `REPLACE_HOME`, so it has never worked (exit 78). Either run
-`scripts/install-timetrack-agents.sh` properly or unload it.
+**2. `com.grow.timetrack-import`.** Retired Oct 21 2026.
 
 **3. Delete the probe scripts.** `probe-amplify.mjs`, `probe-amplify2/3/4`,
 `probe-reports`, `probe-salesrabbit`, `probe-sr-hosts` — seven files that were

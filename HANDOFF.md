@@ -33,7 +33,8 @@ to expect.
   the Opendoor / Realtime Results portal for Ezee, Bluepeak and Omni, Sequifi
   (admin), Canva team, and Surf (only if install slots are kept)
 - The data archive `grow-data-<date>.tar.gz` (AirDrop or a restricted Drive link)
-- The shared mailbox that ISP lead emails go to, with a Google App Password
+- A Gmail app password for the mailbox that sends login codes and crawler
+  failure emails
 
 ## Setup, step by step
 
@@ -44,17 +45,18 @@ to expect.
 | 3 | fill in secrets | Copy values from the vault. `GrowSales/.env.example` says which name goes in which file |
 | 4 | `bash bootstrap.sh data <archive>` | Unpacks the crawl store and state files (~2 GB) |
 | 5 | `bash bootstrap.sh logins` | Prints the sign-in commands. Each opens Chrome; sign in with **your** account |
-| 6 | `bash bootstrap.sh jobs` | Installs the 7 scheduled jobs (below) |
+| 6 | `bash bootstrap.sh jobs` | Installs the 6 scheduled jobs (below) plus the 3 task bots |
 | 7 | `bash bootstrap.sh verify` | Health check. Then watch the dashboard health board (More > Admin) turn green over a day |
-| 8 | optional | `bash bootstrap.sh wolfoffice`, see `WolfOffice/README.md` |
 
 macOS will ask for permissions the first time some jobs run (Files and Folders,
 Full Disk Access, Automation). Say yes for bash, node, python3 and Terminal.
 
 ## What runs by itself
 
-**On Vercel** (no laptop needed): Sequifi deals sync, Sequifi teams, Bria sales
-sync, the sync watchdog, and the Monday weekly summary (`GrowSales/vercel.json`).
+**On Vercel** (no laptop needed): `bria-sync` (Bria sales), `sequifi-sync`
+(Sequifi user mirror), `sequifi-teams-sync` (weekly teams). Schedules in
+`GrowSales/vercel.json`. Deals come hourly from the Rep Sales Google Sheet's
+Apps Script, not from Vercel.
 
 **On your Mac** (launchd; `bash GrowSales/scripts/install-all-agents.sh --list`):
 
@@ -64,9 +66,12 @@ sync, the sync watchdog, and the Monday weekly summary (`GrowSales/vercel.json`)
 | com.grow.amplify-sync | same | TDS knocks from Amplify |
 | com.grow.rtr-sync | same, 08:00 to 23:00 | Ezee / Bluepeak / Omni knocks and hours from Opendoor |
 | com.grow.isp-export | hourly, first run after 07:00 does the work | ISP knocking workbooks onto the shared drive, sector maps |
-| com.grow.mail-leads | every 10 min | Saves ISP lead attachments from the shared mailbox into `imports/isp/` |
-| com.grow.isp-intake | every 5 min | Archives new lead files to Drive and parks them for review |
-| com.grow.timetrack-import | when a file lands in `imports/` | Imports SalesRabbit Time Track exports (clock hours) |
+| com.grow.isp-intake | every 5 min | Archives new lead files dropped in `GrowSales/imports/isp/` to Drive and parks them for review |
+| com.grow.ezee-addresses | hourly, first run after 07:00 does the work | Ezee-spelled address list → `ezee_addresses` → the "Ezee Addresses" Sheet |
+
+Plus the three **task bots** from `~/WolfOffice` (`runner-grow` executes
+Run / Fix / Restart from More > Admin > Sources; `slots-tds` and `slots-surf`
+feed Install Slots). See `docs/knowledge/task-bots.md`.
 
 ## What still needs a person
 
@@ -74,22 +79,21 @@ Ask Claude for any of these in plain words. The skill or knowledge file it will
 use is in brackets.
 
 **When a file arrives**
-- An ISP sends a lead or sector spreadsheet, or one is parked in
-  `imports/isp/parked`: "process the parked file from i3" (isp-leads skill).
-  Claude builds **one** SalesRabbit CSV per workbook; you upload it to
-  SalesRabbit by hand. Then the sector map: "add these to the map".
+- An ISP sends a lead or sector spreadsheet: drop it in `GrowSales/imports/isp/`
+  (or it is already parked in `imports/isp/parked`) and say "process the parked
+  file from i3" (isp-leads skill). Claude builds **one** SalesRabbit CSV per
+  workbook; you upload it to SalesRabbit by hand. Then the sector map: "add
+  these to the map".
 - An ISP cancel list: cancel-list-import skill.
-- A Terros territory file: terros-import skill.
-- A Time Track export: drop it in `GrowSales/imports/` or use the timetrack-import skill.
+- An ISP deal list to verify by phone: dealcheck-import skill.
+- A leads export to clean: leads-dedup skill.
 
 **Weekly**
-- Paste the **subs list**: Claude marks those reps as subs (`docs/knowledge/teams-roster-subs.md`).
-- Paste the **schedule** and ask "who's missing from Sequifi" (sequifi-roster-check skill).
 - **Upfront pay**: pay week runs Thu to Wed, processed Thursday, paid Friday
   (`docs/knowledge/pay-and-payroll.md`).
-- **Manager meeting**: the Canva deck plus More > Meeting in the dashboard
+- **Manager meeting**: the Monday Canva deck
   (`docs/knowledge/meetings-and-decks.md`).
-- **Weekly rep email**: sent by hand from the dashboard control panel.
+- **Bonus review**: KPI Bonus lens (`docs/knowledge/metrics-definitions.md`).
 
 **Every ~60 days**: the Sequifi token expires (the Vercel sync starts failing
 with 401). Mint a new one and update `SEQUIFI_TOKEN` in Vercel and

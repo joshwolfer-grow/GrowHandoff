@@ -51,8 +51,7 @@ Test pay logic with a Node harness that lifts functions out of index.html (seed 
 
 - Idea: pay new reps a ramp bonus over their first weeks so they ramp fast, then hand them to managers. **The ramp clock counts WORKED weeks, not calendar weeks**: a qualifying week = 4 or more days of more than 10 doors, inside an 8 calendar-week window; the ramp is 4 worked weeks. Reps knock in bursts, so a calendar clock showed median 0 worked days by week 3 even for stayers.
 - Baseline (cohort Feb to Jul 2026 starts, 255 reps, computed Oct 20): 96 worked one week only, 38 reached 8+ worked weeks; stayers' PRA goes ~1.0 to ~1.9 by worked week 5; week-1 stats do not predict who stays; week 1 to 2 deals install at ~0.45 vs 0.7+ later. Numbers in `GrowSales/docs/ramp-bonus-baseline.md`.
-- Built Oct 20 2026: **Ramp strip on the rep snapshot** (`api/weekly-rep-email.js` `buildRamp` / `rampHtml`, `RAMP` config, section key `ramp`) reading the `rep_ramp_weeks` view (`api/ramp-schema.sql`). The strip hides 4 weeks after graduation or close. **Pay amounts $100 base / $200 stretch / $300 graduation are PLACEHOLDERS** the owner never set. Pay would follow the upfront model (on installs, 90-day hold). Uses the true-PRA day rule.
-- Rendering the email module locally needs the anon key from index.html plus a WebSocket stub on Node 20 (`.env.local` / `.env.prod` have blank Supabase values).
+- Built Oct 20 2026: a Ramp strip on the rep snapshot (`api/weekly-rep-email.js`, retired Oct 21 2026 with the weekly rep email) reading the `rep_ramp_weeks` view (`api/ramp-schema.sql`), which still exists. **Pay amounts $100 base / $200 stretch / $300 graduation were PLACEHOLDERS** the owner never set. Pay would follow the upfront model (on installs, 90-day hold). Uses the true-PRA day rule.
 
 ## Bonus
 

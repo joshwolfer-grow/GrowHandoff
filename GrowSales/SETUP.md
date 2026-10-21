@@ -1,6 +1,8 @@
 # Setting this up on a new Mac
 
-Everything the dashboard shows comes from four scrapers that run on **one Mac**
+(Aug 2026 runbook. The current one is `../bootstrap.sh` + `../HANDOFF.md`; this page is kept for the explanations.)
+
+Everything the dashboard shows comes from scrapers that run on **one Mac**
 via launchd. The Vercel side (the dashboard itself and everything under `api/`)
 is not tied to a machine and needs nothing from you when you switch laptops.
 
@@ -46,13 +48,13 @@ syncs working immediately rather than after a re-login:
 
 Everything else under `data/` is either regenerated or was never needed —
 `.gitignore` allowlists the handful of config files that *are* tracked
-(`isps.json`, `rtr-sources.json`, `amplify-sources.json`, `terros-reps.json`,
-`sr-lookups.json`).
+(`isps.json`, `rtr-sources.json`, `amplify-sources.json`, `sr-lookups.json`;
+`terros-reps.json` is leftover from the retired Terros import).
 
 ## 3. The scrapers
 
 ```bash
-bash scripts/install-agents.sh
+bash scripts/install-all-agents.sh
 ```
 
 That rewrites the launchd plists for this machine's repo path and node install,
@@ -67,21 +69,18 @@ node scripts/rtr-sync.mjs --login                        # Opendoor (SSO)
 node scripts/amplify-company-sync.mjs --source tds --login
 ```
 
-Time Track needs no login — it is a folder watcher. Drop a Time Track CSV export
-into `imports/` and it imports itself.
-
 ## 4. Check it worked
 
 Open the dashboard → **Admin › Ops**. The **Automations** board at the top is the
-whole answer: four rows, green when each pipeline has run recently. A red row
-names the command that fixes it.
+whole answer: one row per pipeline, green when it has run recently. A red row
+names the command that fixes it. (The board now lives at More > Admin.)
 
 | Row | Runs | Notes |
 |---|---|---|
 | SalesRabbit knock sync | every 10 min | doors, contacts, dispositions |
 | Opendoor hours (RTR) | hourly, 8am–10pm | clock hours; exit 3 = SSO expired |
 | TDS Amplify sync | every 10 min | separate company, separate login |
-| Time Track clock hours | on file drop | the one manual export left |
+| ISP export, ISP intake, Ezee addresses | daily / 5 min / daily | see `../docs/knowledge/syncs-and-schedules.md` |
 
 Give it 10–15 minutes after seeding before judging the board — the interval
 agents have to tick once.

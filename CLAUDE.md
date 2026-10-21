@@ -6,11 +6,10 @@ over from the previous owner (Josh) in October 2026. It is cloned to `~/Grow`.
 | Folder | What it is |
 |---|---|
 | `GrowSales/` | The dashboard (growsales.vercel.app: `index.html` + `api/` on Vercel), every sync and import script (`scripts/`), launchd job templates. **Most work happens here.** Read `GrowSales/CLAUDE.md` before touching it |
-| `WolfOffice/` | Optional status layer: Grow "workers" that snapshot the data each morning, an office UI on localhost:8787, the 9 AM manager texts. The syncs run fine without it. See `WolfOffice/README.md` |
+| `WolfOffice/` | The task bots folder (installed to `~/WolfOffice`): `runner-grow` executes Run / Fix / Restart from More > Admin > Sources, `slots-tds` / `slots-surf` feed Install Slots. Everything else in it is retired. See `docs/knowledge/task-bots.md` |
 | `RepText/` | AppleScript + Python that sends bulk iMessages to reps from this Mac's Messages account |
-| `TrainingVideos/` | ffmpeg + whisper pipeline for training videos (`PIPELINE.md`). Footage lives on Drive, not in git |
 | `docs/knowledge/` | **How everything works and why.** Start at `docs/knowledge/README.md` |
-| `.claude/skills/` | The Grow skills (ISP lead files, Time Track, cancel lists, Terros, Sequifi roster check, training decks, leads dedupe) |
+| `.claude/skills/` | The Grow skills (ISP lead files, cancel lists, deal check lists, training decks, leads dedupe) |
 | `PROCESSES.md` | **The process handoff, Oct 21 2026: one page, every routine, what is broken.** Read first |
 | `bootstrap.sh`, `HANDOFF.md` | Setting up a new Mac |
 
@@ -29,8 +28,7 @@ needs their login or a value from the password manager.
    time. Do not re-derive a definition that is written down there.
 2. For anything in `GrowSales/`, follow `GrowSales/CLAUDE.md`.
 3. If a skill in `.claude/skills/` covers the task (an ISP file arrived, a
-   Time Track export, a cancel list, a schedule to check against Sequifi),
-   use the skill.
+   cancel list, a deal check list, a leads export), use the skill.
 
 ## House rules
 
