@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Grow Money Guide</title>
+<meta name="description" content="Tax, S Corp, tracking, emergency fund, investing, and real estate for commission reps.">
+<!-- Public explainer for the money trainings. No sign in, no network calls.
+     Eight sections with ids, so a training can link straight to one:
+     #tax #s-corp-when #s-corp-how #tracking #e-fund #investing #real-estate #next
+     Numbers must match the decks and calculator.html: $60,000 net profit line,
+     15.3% self employment tax, $600 setup and $1,000 a year through Grow's
+     tax guy, 8 to 9 deals a week. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f2f2ec;--card:#fff;--ink:#0b0c0b;--ink3:#48484a;--ink4:#86868b;
+  --line:rgba(60,60,67,0.12);--green:#178f3f;--lime:#34c759;--tint:#e6f4ea;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html{scroll-behavior:smooth;}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+.hd{background:#000;color:#fff;padding:22px 18px 22px;}
+.hd-in,.wrap{max-width:460px;margin:0 auto;}
+.logo{height:26px;display:block;}
+.kick{color:var(--lime);font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;margin-top:20px;}
+.title{font-family:'Archivo Black',Impact,sans-serif;font-size:27px;line-height:1.02;text-transform:uppercase;margin-top:4px;}
+.wrap{padding:18px 14px 60px;}
+.toc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:6px 16px;margin-bottom:26px;}
+.toc a{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line);
+  color:var(--ink);text-decoration:none;font-size:15px;font-weight:600;}
+.toc a:first-child{border-top:0;}
+.toc a span{color:var(--ink4);font-weight:600;font-variant-numeric:tabular-nums;font-size:13px;}
+section{padding:8px 0 22px;scroll-margin-top:16px;}
+h2{font-family:'Archivo Black',Impact,sans-serif;font-size:19px;line-height:1.1;text-transform:uppercase;margin:0 0 14px;}
+h2 span{color:var(--ink4);font-size:12px;letter-spacing:.08em;display:block;margin-bottom:6px;font-family:inherit;}
+h3{font-size:15px;font-weight:700;margin:20px 0 6px;}
+p{font-size:15.5px;line-height:1.55;color:var(--ink3);margin:0 0 12px;}
+p b,li b{color:var(--ink);font-weight:700;}
+ol,ul{margin:0 0 12px;padding-left:22px;}
+li{font-size:15.5px;line-height:1.5;color:var(--ink3);margin-bottom:7px;}
+.rows{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px 16px;margin:14px 0 16px;}
+.r{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:11px 0;border-top:1px solid var(--line);font-size:15px;}
+.r:first-child{border-top:0;}
+.r span{color:var(--ink3);}
+.r b{font-variant-numeric:tabular-nums;white-space:nowrap;}
+.r .yes{color:var(--green);}
+.r .no{color:var(--ink4);}
+.tbl{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px 16px;margin:14px 0 16px;font-size:15px;}
+.tbl .th,.tbl .tr{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:10px;padding:10px 0;border-top:1px solid var(--line);align-items:baseline;}
+.tbl .th{border-top:0;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ink4);}
+.tbl .tr span{color:var(--ink3);font-variant-numeric:tabular-nums;}
+.tbl .tr b{font-variant-numeric:tabular-nums;}
+.tbl .yes{color:var(--green);}
+.tbl .no{color:var(--ink4);}
+.key{background:var(--tint);border-radius:14px;padding:14px 16px;margin:14px 0 16px;}
+.key p{color:#0f3d1e;margin:0;font-weight:600;}
+.key p+p{margin-top:8px;font-weight:500;}
+.go{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#000;color:#fff;border-radius:13px;
+  padding:14px 16px;text-decoration:none;font-size:15px;font-weight:700;margin:16px 0 4px;}
+.go span{color:var(--lime);font-weight:500;white-space:nowrap;}
+hr{border:0;border-top:1px solid var(--line);margin:8px 0 22px;}
+.fine{font-size:12px;color:var(--ink4);line-height:1.5;margin:26px 2px 0;text-align:center;}
+</style>
+</head>
+<body>
+<div class="hd"><div class="hd-in">
+  <img class="logo" src="/grow-wordmark.png" alt="Grow">
+  <div class="kick">Money</div>
+  <div class="title">Money after<br>commission</div>
+</div></div>
+
+<div class="wrap">
+
+<nav class="toc" aria-label="Sections">
+  <a href="#tax">Setting aside tax<span>1</span></a>
+  <a href="#s-corp-when">When an S Corp makes sense<span>2</span></a>
+  <a href="#s-corp-how">How an S Corp works<span>3</span></a>
+  <a href="#tracking">Tracking expenses<span>4</span></a>
+  <a href="#e-fund">Emergency fund<span>5</span></a>
+  <a href="#investing">Investing<span>6</span></a>
+  <a href="#real-estate">Real estate<span>7</span></a>
+  <a href="#next">What comes next<span>8</span></a>
+</nav>
+
+<section id="tax">
+  <h2><span>1</span>Setting aside tax</h2>
+  <p>Nothing is withheld from a 1099 check. You owe income tax plus 15.3% self employment tax, and the bill comes once a year in April.</p>
+  <div class="key">
+    <p>Move 25% to 35% of every check into a separate savings account the day it lands. Pay April out of that account.</p>
+  </div>
+  <p>Different bank from your checking, high yield, no fee. Your CPA sets the exact percentage. If you have to guess, guess high.</p>
+  <a class="go" href="/calculator.html?c=income">See the set aside at your deal count<span>Calculator</span></a>
+</section>
+<hr>
+
+<section id="s-corp-when">
+  <h2><span>2</span>When an S Corp makes sense</h2>
+  <p>An S Corp splits your profit into a salary and distributions. The salary still pays the 15.3%. The distributions do not. That is the saving, and it grows with your profit. The fee is flat: about $600 once, then $1,000 to $1,600 a year through Grow's tax guy. Past a certain profit the saving beats the fee.</p>
+  <div class="tbl">
+    <div class="th"><span>Net profit</span><span>Saved</span><span>After fees</span></div>
+    <div class="tr"><span>$40,000</span><span>$1,800</span><b class="no">Behind</b></div>
+    <div class="tr"><span>$50,000</span><span>$2,300</span><b class="no">A few hundred ahead</b></div>
+    <div class="tr"><span>$60,000</span><span>$3,100</span><b class="yes">$1,500 ahead</b></div>
+    <div class="tr"><span>$80,000</span><span>$4,600</span><b class="yes">$3,000 ahead</b></div>
+    <div class="tr"><span>$150,000</span><span>$9,900</span><b class="yes">$8,300 ahead</b></div>
+  </div>
+  <div class="key">
+    <p>The line is about $60,000 of net profit, after expenses. About 8 to 9 deals a week for a full year.</p>
+  </div>
+  <p>File Form 2553 by March 15. It cannot be done after the year is over. Ask your manager for the tax guy.</p>
+  <a class="go" href="/calculator.html?c=s-corp">Check your own numbers against the line<span>Calculator</span></a>
+</section>
+<hr>
+
+<section id="s-corp-how">
+  <h2><span>3</span>How an S Corp works</h2>
+  <p>It is a tax election on an LLC, not a new company. You become an employee of your own business. Set a reasonable salary with your CPA and run real payroll. A salary that looks too low is what gets audited.</p>
+  <ol>
+    <li>Form an LLC in your state</li>
+    <li>Get an EIN from the IRS, free</li>
+    <li>File Form 2553</li>
+    <li>Set the salary with your CPA</li>
+    <li>Run payroll through a payroll service</li>
+    <li>Separate business bank account, nothing personal</li>
+    <li>The S Corp files its own return each year</li>
+  </ol>
+  <div class="key">
+    <p>Deductions lower your taxes and also lower the income a lender counts. If a house is in the next few years, tell your CPA before you file.</p>
+  </div>
+</section>
+<hr>
+
+<section id="tracking">
+  <h2><span>4</span>Tracking expenses</h2>
+  <p>A deduction only counts if you can show it.</p>
+  <div class="key">
+    <p>One business bank account and one business card. Everything business goes through them, nothing personal does.</p>
+  </div>
+  <p>Log mileage with an app. Photo every receipt. Fifteen minutes a month to match the card statement to the receipts. What usually counts: mileage, phone, gear, software, blitz travel, half of meals, a home office if it qualifies.</p>
+</section>
+<hr>
+
+<section id="e-fund">
+  <h2><span>5</span>Emergency fund</h2>
+  <p>Commission is uneven. The bills are not.</p>
+  <div class="key">
+    <p>Three to six months of expenses in its own savings account. Not the tax account, not checking.</p>
+  </div>
+  <p>If you carry a card at 18% or more, pay it off first. That is a guaranteed return and nothing else on this page is. Fund it once, leave it alone, and refill it first after you use it.</p>
+</section>
+<hr>
+
+<section id="investing">
+  <h2><span>6</span>Investing</h2>
+  <p>After tax, the fund, and any high interest debt, what is left gets invested. Retirement accounts first, a Solo 401(k) or SEP IRA, your CPA picks. Then a regular brokerage account.</p>
+  <div class="key">
+    <p>Broad, low cost index funds, on an automatic transfer the day after commissions land.</p>
+  </div>
+  <p>Fees compound against you. Set an amount you can hold through a slow quarter, raise it after a strong one. What loses reps money early: stocks off social media and leveraged products.</p>
+  <a class="go" href="/calculator.html?c=invest">See what a monthly amount becomes<span>Calculator</span></a>
+</section>
+<hr>
+
+<section id="real-estate">
+  <h2><span>7</span>Real estate</h2>
+  <p>Property comes after the base above exists. It makes money five ways: cash flow, appreciation, loan paydown, tax treatment, and leverage. Two structures to know. <b>House hacking</b>: buy a 2 to 4 unit, live in one, rent the rest, small down payment. <b>BRRRR</b>: buy, rehab, rent, refinance, repeat.</p>
+  <div class="key">
+    <p>Before buying: structure filed, tax moving automatically, no high interest debt, reserves kept separate from the down payment.</p>
+  </div>
+  <p>Lenders want two years of filed returns, and they read the returns, not your commission.</p>
+  <a class="go" href="/quiz.html?q=buyer">Which kind of deal you are drawn to<span>Quiz</span></a>
+</section>
+<hr>
+
+<section id="next">
+  <h2><span>8</span>What comes next</h2>
+  <p>Once the base runs itself, the money past it is yours to build with. A business, a bigger property, a partnership.</p>
+  <div class="key">
+    <p>Fund it from surplus only. Decide the share in advance. Write down why.</p>
+  </div>
+  <p>The quiz shows how you tend to handle money and what you usually miss.</p>
+  <a class="go" href="/quiz.html">Find your investor type<span>Quiz</span></a>
+</section>
+
+<p class="fine">Education only. Nothing here is financial, tax, investment, or legal advice, and Grow does not recommend any specific account, fund, entity, lender, or property. Every number is illustrative. Talk to your own CPA, lender, and licensed advisor before acting on any of it.</p>
+</div>
+<script>
+// Chrome can skip the initial anchor jump when scroll-behavior is smooth and
+// the web font lands after layout. Jump again once fonts are ready.
+(function(){
+  function go(){var t=location.hash&&document.getElementById(location.hash.slice(1));if(t)t.scrollIntoView({behavior:'auto',block:'start'});}
+  go();
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(go);
+  window.addEventListener('load',go);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Grow · Rep Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  html,body{margin:0;height:100%;font:13px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#1d232a;background:#eef0f2}
+  button,select,input{font:inherit;color:inherit}
+  #map{position:absolute;inset:0}
+  .leaflet-top.leaflet-left{top:66px}
+  .bar{position:absolute;z-index:1000;top:10px;left:10px;right:10px;min-height:48px;box-sizing:border-box;display:flex;flex-wrap:wrap;gap:8px 10px;
+       align-items:center;background:#fff;border-radius:12px;padding:7px 8px 7px 14px;box-shadow:0 2px 10px rgba(0,0,0,.16)}
+  .ttl{font-size:15px;font-weight:800;white-space:nowrap}
+  .seg{display:flex;gap:2px;padding:3px;border-radius:10px;background:#eceef1}
+  .seg button{height:28px;padding:0 12px;border:0;border-radius:7px;background:transparent;color:#555d66;font-weight:500;cursor:pointer}
+  .seg button.on{background:#fff;color:#1d232a;font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+  .bar input,.bar select{height:34px;border:1px solid #d9dce1;border-radius:9px;background:#fff;padding:0 8px;box-sizing:border-box}
+  .bar select{max-width:200px}
+  .spacer{flex:1}
+  .upd{color:#6b7178;font-size:12px;white-space:nowrap}
+
+  #panel{position:absolute;z-index:1001;top:68px;right:10px;bottom:22px;width:300px;background:#fff;border-radius:14px;
+         box-shadow:0 6px 24px rgba(0,0,0,.2);display:flex;flex-direction:column;overflow:hidden}
+  .ph{padding:14px 16px 10px;border-bottom:1px solid #eef0f2}
+  .ph h2{margin:0;font-size:18px}
+  .ph .sub{color:#6b7178;font-size:12px;margin-top:3px}
+  .pb{overflow:auto;flex:1}
+  .row{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid #f3f4f6;cursor:pointer}
+  .row:hover{background:#f6f7f9}
+  .row .nm{flex:1;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .ago{color:#6b7178;font-size:12px;white-space:nowrap}
+  .dot{width:10px;height:10px;border-radius:50%;flex:none}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 16px;border-bottom:1px solid #eef0f2}
+  .stats div b{display:block;font-size:17px}
+  .stats div span{color:#6b7178;font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+  .sec{padding:10px 16px 4px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7178}
+  .stop{display:flex;justify-content:space-between;padding:7px 16px;border-bottom:1px solid #f3f4f6;cursor:pointer}
+  .stop:hover{background:#f6f7f9}
+  .stop span{color:#6b7178}
+  .empty{padding:16px;color:#6b7178}
+
+  .scrub{position:absolute;z-index:1000;left:10px;right:320px;bottom:22px;background:#fff;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.16);
+         padding:10px 14px;display:flex;gap:12px;align-items:center}
+  .scrub[hidden]{display:none}
+  .scrub input{flex:1}
+  .scrub b{min-width:70px;text-align:right;font-variant-numeric:tabular-nums}
+  .scrub button{height:30px;width:34px;border:1px solid #d9dce1;border-radius:8px;background:#fff;cursor:pointer}
+
+  .lbl{background:#fff;border:0;border-radius:6px;padding:1px 6px;font-weight:700;font-size:11px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .lbl:before{display:none}
+  .nolbl .lbl{display:none}
+
+  @media (max-width:760px){
+    #panel{top:auto;left:10px;right:10px;width:auto;height:38%;bottom:10px}
+    .scrub{right:10px;bottom:calc(38% + 18px)}
+    .leaflet-top.leaflet-left{top:110px}
+  }
+</style>
+</head><body>
+<div id="map"></div>
+<div class="bar">
+  <span class="ttl">Rep Map</span>
+  <div class="seg" id="mode"><button data-m="live" class="on">Live</button><button data-m="trail">Trail</button></div>
+  <input type="date" id="day" aria-label="Day">
+  <select id="rep" aria-label="Rep" hidden></select>
+  <span class="spacer"></span>
+  <span class="upd" id="upd"></span>
+</div>
+<aside id="panel"><div class="ph"><h2 id="ptitle"></h2><div class="sub" id="psub"></div></div><div class="pb" id="pbody"></div></aside>
+<div class="scrub" id="scrub" hidden><button id="play" aria-label="Play">▶</button><input type="range" id="slide" min="0" max="0" value="0"><b id="stime"></b></div>
+<script>
+// Data: rep_gps (scripts/rep-locations-sync.mjs, noon to 10pm local, last 31 days), one SalesRabbit GPS ping
+// per rep about every 5 minutes while the app runs. Refreshed on the knocking
+// tick, so "live" is as fresh as the last sync (10 minutes in the day).
+var SB='https://cmkfohwbejcztctrpdnt.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNta2ZvaHdiZWpjenRjdHJwZG50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNDYyODgsImV4cCI6MjA5NzgyMjI4OH0.waLa5E9a6SMvJ70keY9duAz4VxK39sDNNbmPSSbcebo';
+var H={apikey:KEY,Authorization:'Bearer '+KEY};
+// The sync already keeps only noon to 10pm in each rep's own zone, so a day here
+// is the whole calendar day in the viewer's zone.
+var DAY_START=0,DAY_END=24;
+// a stop: pings staying within 50 m for 20+ minutes. Knocking one block moves
+// ~100 m per ping, so a wider ring reads slow knocking as standing still.
+var STOP_M=50,STOP_MIN=20;
+
+var map=L.map('map',{preferCanvas:true,zoomControl:true}).setView([39.5,-98],4);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
+var layer=L.layerGroup().addTo(map);
+// names only once zoomed in to a metro; at country zoom they stack into noise
+function labels(){document.body.classList.toggle('nolbl',map.getZoom()<8);}
+map.on('zoomend',labels);
+
+var $=function(id){return document.getElementById(id);};
+var esc=function(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});};
+var pad=function(n){return ('0'+n).slice(-2);};
+var ymd=function(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());};
+// Times are the REP's local time, zone guessed from longitude the same way the
+// sync decides noon to 10pm (scripts/rep-locations-sync.mjs zoneOf).
+var zoneOf=function(lng){return lng>-87.5?'America/New_York':lng>-102?'America/Chicago':lng>-114.5?'America/Denver':'America/Los_Angeles';};
+var ZONE;
+var hm=function(t){return new Date(t).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:ZONE});};
+var ago=function(t){var m=Math.round((Date.now()-t)/6e4);if(m<1)return 'now';if(m<60)return m+'m ago';var h=Math.floor(m/60);return h+'h '+(m%60)+'m ago';};
+var dur=function(ms){var m=Math.round(ms/6e4);return m<60?m+' min':Math.floor(m/60)+'h '+pad(m%60)+'m';};
+function hv(a,b){var R=6371000,t=Math.PI/180,h=Math.pow(Math.sin((b.lat-a.lat)*t/2),2)+Math.cos(a.lat*t)*Math.cos(b.lat*t)*Math.pow(Math.sin((b.lng-a.lng)*t/2),2);return 2*R*Math.asin(Math.sqrt(h));}
+function fresh(t){var m=(Date.now()-t)/6e4;return m<=20?'#1f9d55':(m<=60?'#f0a020':'#9aa1a9');}
+
+var qs=new URLSearchParams(location.search);
+var S={mode:qs.get('rep')?'trail':'live',day:qs.get('day')||ymd(new Date()),rep:qs.get('rep')||'',pts:[],loadedAt:0};
+$('day').value=S.day;$('day').max=ymd(new Date());$('day').min=ymd(new Date(Date.now()-30*864e5));
+
+// one day of pings, paged (PostgREST caps a response at 1000 rows)
+function loadDay(day){
+  var s=new Date(day+'T00:00:00'),a=new Date(s),b=new Date(s);a.setHours(DAY_START);b.setHours(DAY_END);
+  var base=SB+'/rest/v1/rep_gps?select=rep,ts,lat,lng&ts=gte.'+encodeURIComponent(a.toISOString())+'&ts=lt.'+encodeURIComponent(b.toISOString())+'&rep=not.is.null&order=ts';
+  var out=[];
+  function page(off){
+    return fetch(base+'&limit=1000&offset='+off,{headers:H}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+      .then(function(rows){out=out.concat(rows);return rows.length===1000?page(off+1000):out;});
+  }
+  return page(0).then(function(rows){return rows.map(function(r){return {rep:r.rep,t:Date.parse(r.ts),lat:r.lat,lng:r.lng};});});
+}
+
+function byRep(pts){var m={};pts.forEach(function(p){(m[p.rep]=m[p.rep]||[]).push(p);});return m;}
+
+function refresh(fit){
+  $('upd').textContent='Loading…';
+  return loadDay(S.day).then(function(pts){S.pts=pts;S.loadedAt=Date.now();paint(fit);})
+    .catch(function(){$('upd').textContent='Could not load';});
+}
+
+function paint(fit){
+  layer.clearLayers();stopPlay();
+  $('rep').hidden=S.mode!=='trail';$('scrub').hidden=true;
+  document.querySelectorAll('#mode button').forEach(function(b){b.classList.toggle('on',b.dataset.m===S.mode);});
+  var reps=byRep(S.pts),names=Object.keys(reps).sort();
+  $('rep').innerHTML='<option value="">Pick a rep</option>'+names.map(function(n){return '<option'+(n===S.rep?' selected':'')+'>'+esc(n)+'</option>';}).join('');
+  var newest=S.pts.length?S.pts[S.pts.length-1].t:0;
+  $('upd').textContent=newest?'Newest ping '+ago(newest):'';
+  if(S.mode==='live')paintLive(reps,names,fit);else paintTrail(reps[S.rep]||[],fit);
+}
+
+function paintLive(reps,names,fit){
+  var today=S.day===ymd(new Date());
+  var last=names.map(function(n){var a=reps[n];return a[a.length-1];}).sort(function(a,b){return b.t-a.t;});
+  $('ptitle').textContent=today?'Where reps are':'Last seen '+new Date(S.day+'T12:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  $('psub').textContent=last.length?last.length+' reps with GPS'+(today?', newest ping first':''):'';
+  if(!last.length){$('pbody').innerHTML='<div class="empty">No GPS pings '+(today?'yet today':'that day')+'.</div>';return;}
+  var bounds=[];
+  ZONE=undefined;
+  last.forEach(function(p){
+    var c=today?fresh(p.t):'#3b6fd8';
+    L.circleMarker([p.lat,p.lng],{radius:8,color:'#fff',weight:2,fillColor:c,fillOpacity:1})
+      .bindTooltip(esc(p.rep.split(' ')[0]),{permanent:true,direction:'right',offset:[8,0],className:'lbl'})
+      .on('click',function(){openTrail(p.rep);}).addTo(layer);
+    bounds.push([p.lat,p.lng]);
+  });
+  $('pbody').innerHTML=last.map(function(p){
+    return '<div class="row" data-rep="'+esc(p.rep)+'"><i class="dot" style="background:'+(today?fresh(p.t):'#3b6fd8')+'"></i><span class="nm">'+esc(p.rep)+'</span><span class="ago">'+(today?ago(p.t):(ZONE=zoneOf(p.lng),hm(p.t)))+'</span></div>';
+  }).join('');
+  $('pbody').querySelectorAll('.row').forEach(function(r){r.onclick=function(){openTrail(r.dataset.rep);};});
+  if(fit&&bounds.length)map.fitBounds(bounds,{padding:[60,60],maxZoom:14});
+  labels();
+}
+
+function stops(a){
+  var out=[],i=0;
+  while(i<a.length){
+    var j=i;while(j+1<a.length&&hv(a[i],a[j+1])<=STOP_M)j++;
+    if(a[j].t-a[i].t>=STOP_MIN*6e4)out.push({from:a[i].t,to:a[j].t,lat:a[i].lat,lng:a[i].lng});
+    i=j+1;
+  }
+  return out;
+}
+
+function paintTrail(a,fit){
+  $('ptitle').textContent=S.rep||'Trail';
+  if(!S.rep){$('psub').textContent='';$('pbody').innerHTML='<div class="empty">Pick a rep to see their trail for the day.</div>';return;}
+  if(!a.length){$('psub').textContent='';$('pbody').innerHTML='<div class="empty">No GPS pings that day.</div>';return;}
+  ZONE=zoneOf(a[0].lng);
+  var km=0,long=0,drive=0;
+  for(var i=1;i<a.length;i++){var d=hv(a[i-1],a[i]),gap=a[i].t-a[i-1].t;km+=d;if(gap>long)long=gap;
+    if(gap>0&&d/(gap/1000)>6.7)drive+=d;}   // faster than 15 mph between pings is a car
+  var st=stops(a),ll=a.map(function(p){return [p.lat,p.lng];});
+  $('psub').textContent=new Date(S.day+'T12:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+  L.polyline(ll,{color:'#3b6fd8',weight:4,opacity:.85}).addTo(layer);
+  a.forEach(function(p){L.circleMarker([p.lat,p.lng],{radius:3,color:'#1d4fb0',weight:1,fillColor:'#fff',fillOpacity:1}).bindTooltip(hm(p.t)).addTo(layer);});
+  st.forEach(function(s){L.circleMarker([s.lat,s.lng],{radius:11,color:'#b25e00',weight:2,fillColor:'#f0a020',fillOpacity:.35})
+    .bindTooltip('Stopped '+dur(s.to-s.from)+', '+hm(s.from)+' to '+hm(s.to)).addTo(layer);});
+  L.circleMarker(ll[0],{radius:8,color:'#fff',weight:2,fillColor:'#1f9d55',fillOpacity:1}).bindTooltip('First ping '+hm(a[0].t)).addTo(layer);
+  L.circleMarker(ll[ll.length-1],{radius:8,color:'#fff',weight:2,fillColor:'#d73027',fillOpacity:1}).bindTooltip('Last ping '+hm(a[a.length-1].t)).addTo(layer);
+  var walk=(km-drive)/1609.34,car=drive/1609.34;
+  var h='<div class="stats">'
+    +'<div><b>'+hm(a[0].t)+'</b><span>First ping</span></div>'
+    +'<div><b>'+hm(a[a.length-1].t)+'</b><span>Last ping</span></div>'
+    +'<div><b>'+walk.toFixed(1)+' mi</b><span>On foot</span></div>'
+    +'<div><b>'+car.toFixed(1)+' mi</b><span>Driving</span></div>'
+    +'<div><b>'+a.length+'</b><span>Pings</span></div>'
+    +'<div><b>'+dur(long)+'</b><span>Longest gap</span></div></div>'
+    +'<div class="empty" style="font-size:12px;padding:8px 16px">Times are '+new Date(a[0].t).toLocaleTimeString('en-US',{timeZone:ZONE,timeZoneName:'short'}).split(' ').pop()+', the rep\'s local time.</div>';
+  h+='<div class="sec">Stopped '+STOP_MIN+'+ min</div>';
+  h+=st.length?st.map(function(s,k){return '<div class="stop" data-k="'+k+'"><b>'+hm(s.from)+' to '+hm(s.to)+'</b><span>'+dur(s.to-s.from)+'</span></div>';}).join(''):'<div class="empty">None</div>';
+  $('pbody').innerHTML=h;
+  $('pbody').querySelectorAll('.stop').forEach(function(r){r.onclick=function(){var s=st[+r.dataset.k];map.setView([s.lat,s.lng],17);};});
+  // scrubber: a marker that walks the trail
+  S.trail=a;S.cursor=L.circleMarker(ll[0],{radius:9,color:'#fff',weight:3,fillColor:'#1d232a',fillOpacity:1}).addTo(layer);
+  $('slide').max=a.length-1;$('slide').value=0;$('stime').textContent=hm(a[0].t);$('scrub').hidden=false;
+  if(fit)map.fitBounds(ll,{padding:[60,60],maxZoom:17});
+}
+
+$('slide').oninput=function(){var p=S.trail[+this.value];if(!p)return;S.cursor.setLatLng([p.lat,p.lng]);$('stime').textContent=hm(p.t);};
+var timer=null;
+function stopPlay(){if(timer){clearInterval(timer);timer=null;}$('play').textContent='▶';}
+$('play').onclick=function(){
+  if(timer){stopPlay();return;}
+  if(+$('slide').value>=+$('slide').max)$('slide').value=0;
+  $('play').textContent='❚❚';
+  timer=setInterval(function(){var v=+$('slide').value+1;if(v>+$('slide').max){stopPlay();return;}$('slide').value=v;$('slide').oninput();},120);
+};
+
+function setUrl(){var u=new URL(location.href);u.search='';if(S.mode==='trail'&&S.rep)u.searchParams.set('rep',S.rep);if(S.day!==ymd(new Date()))u.searchParams.set('day',S.day);history.replaceState(null,'',u);}
+function openTrail(rep){S.mode='trail';S.rep=rep;setUrl();paint(true);}
+document.querySelectorAll('#mode button').forEach(function(b){b.onclick=function(){S.mode=b.dataset.m;setUrl();paint(true);};});
+$('rep').onchange=function(){S.rep=this.value;setUrl();paint(true);};
+$('day').onchange=function(){if(!this.value)return;S.day=this.value;setUrl();refresh(true);};
+
+refresh(true);
+// keep the live view current; the data itself moves on the 10 minute sync
+setInterval(function(){if(S.day===ymd(new Date())&&!timer)refresh(false);},120000);
+</script>
+</body></html>

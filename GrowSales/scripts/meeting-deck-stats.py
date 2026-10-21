@@ -39,12 +39,33 @@ for t,(isp,st,reps) in T.items():
 bria=[x for x in json.load(open('bria.json')) if W0<=x['sale_date']<=W1]
 knock=[x for x in json.load(open('knock.json')) if W0<=x['date']<=W1]
 deals=json.load(open('deals_aug.json'))
+# Intake accounts are not reps (GROW_INTAKE in index.html).
+INTAKE={key('Nick Boyd'),key('Daxton Day')}
 rep={}
 def R(k,t): return rep.setdefault(k,{'t':t,'doors':0,'q':0,'c':0,'s':0,'h':0,'deals':0,'days':0})
+# knocking holds a row per (rep, date, source, method). One row per rep/day,
+# the way _mergeKnockingSources in index.html does it: grow-side rows (ezee,
+# grow, sr_activity + timetrack) are the same doors measured twice and take the
+# MAX per field; tds rows are a separate division and add on top; sold never
+# adds (Bria tracks the person), take the max.
+byday={}
 for x in knock:
-    k=key(x['rep']); t=byk.get(k)
+    k=key(x['rep'])
+    if k in INTAKE: continue
+    byday.setdefault((k,x['date']),[]).append(x)
+def merged(rows):
+    grow=[r for r in rows if r.get('source')!='tds']; tds=[r for r in rows if r.get('source')=='tds']
+    live=[r for r in grow if (r.get('doors') or 0)>0 or r.get('first_disp')]
+    doors=max([r.get('doors') or 0 for r in live],default=0)+sum(r.get('doors') or 0 for r in tds)
+    cont=max([r.get('contacts') or 0 for r in live],default=0)+sum(r.get('contacts') or 0 for r in tds)
+    sold=max([r.get('sold') or 0 for r in rows],default=0)
+    hours=max([r.get('hours') or 0 for r in rows],default=0)
+    return doors,cont,sold,hours
+for (k,_d),rows in byday.items():
+    t=byk.get(k)
     if not t: continue
-    r=R(k,t); d=x['doors'] or 0; r['doors']+=d; r['c']+=x['contacts'] or 0; r['s']+=x['sold'] or 0; r['h']+=x['hours'] or 0
+    d,c,sd,h=merged(rows)
+    r=R(k,t); r['doors']+=d; r['c']+=c; r['s']+=sd; r['h']+=h
     if d>10: r['q']+=1
     if d>0: r['days']+=1
 # Per ISP, the report covers days up to its latest sale_date this week.
@@ -55,11 +76,14 @@ for x in reportrows: cov[x['isp']]=max(cov.get(x['isp'],''),x['sale_date'])
 teamisp={t:isp for t,(isp,st,reps) in T.items()}
 rep_report={}; rep_app_after={}
 for x in reportrows:
-    k=key(x['rep']); rep_report.setdefault(k,{'n':0,'pre':0}); rep_report[k]['n']+=1
+    k=key(x['rep'])
+    if k in INTAKE: continue
+    rep_report.setdefault(k,{'n':0,'pre':0}); rep_report[k]['n']+=1
     if x['deal_type']=='Presale': rep_report[k]['pre']+=1
 bria_by={}
 for x in bria:
     k=key(x['rep']); t=byk.get(k)
+    if k in INTAKE: continue
     thru=cov.get(teamisp.get(t,''),'') if t else '9999'
     if x['sale_date']>thru:
         bria_by[k]=bria_by.get(k,0)+x['deals']
@@ -83,11 +107,15 @@ print(f"{'TEAM':28} {'RF':>3} {'40h':>4} {'60d':>4} {'AVGD':>5} {'PRA':>6} {'CLO
 rank=[]
 for t,(isp,st,reps) in T.items():
     rs=[r for r in rep.values() if r['t']==t]
-    worked=[r for r in rs if r['q']>0 or r['deals']>0]
+    # Ten-door rule: a worked rep has a day over 10 doors; a sale alone does not
+    # make one (matches _kwBase / growWorkedReps in index.html).
+    worked=[r for r in rs if r['q']>0]
     logged=[r for r in rs if r['q']>0]
     d=sum(r['deals'] for r in rs); c=sum(r['c'] for r in logged); s=sum(r['s'] for r in logged)
+    # PRA numerator is the sales of reps who have a worked day, like the KPI page.
+    dpra=sum(r['deals'] for r in worked)
     h40=sum(1 for r in rs if r['h']>=40); avgd=(sum(r['doors'] for r in logged)/sum(r['q'] for r in logged)) if logged else None; d60=sum(1 for r in logged if r['doors']/r['q']>=60)
-    pra=d/len(worked) if worked else None; close=s/c if c and s<=c else None
+    pra=dpra/len(worked) if worked else None; close=s/c if c and s<=c else None
     o=ir.get((isp,st)); irv=o[0]/(o[0]+o[1]) if o and sum(o) else None
     f=lambda v,p=False: '·' if v is None else (f"{v*100:.1f}%" if p else f"{v:.1f}")
     print(f"{t:28} {len(worked):>3} {h40:>4} {d60:>4} {('·' if avgd is None else f'{avgd:.0f}'):>5} {f(pra):>6} {f(close,1):>7} {d:>6} {f(irv,1):>7}   (ir n={sum(o) if o else 0}, contacts {c}, ksold {s})")

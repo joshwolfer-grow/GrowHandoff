@@ -67,7 +67,8 @@
       "Austin",
       "Round Rock"
     ],
-    "_note": "Texas minus Austin and Round Rock, which are Google Fiber."
+    "_note": "Texas minus Austin and Round Rock, which are Google Fiber. Workbook stays by city; Lyte.csv is for the map.",
+    "sectors": "city"
   },
   "GFiber": {
     "full_name": "Google Fiber",

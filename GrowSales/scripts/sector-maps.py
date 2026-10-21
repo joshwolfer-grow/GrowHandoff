@@ -38,9 +38,9 @@ sys.path.insert(0, os.path.join(ROOT, 'scripts'))
 SUPA_URL = 'https://cmkfohwbejcztctrpdnt.supabase.co'
 SUPA_ANON = ('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNta2ZvaHdiZWpjenRjdHJwZG50Iiwicm9s'
              'ZSI6ImFub24iLCJpYXQiOjE3ODIyNDYyODgsImV4cCI6MjA5NzgyMjI4OH0.waLa5E9a6SMvJ70keY9duAz4VxK39sDNNbmPSSbcebo')
-# ISPs the site shows. Lyte is held back until its leftover doors are cut into
-# clusters: Lyte's own sectors cover 1,950 of its 42,844 doors.
-PUBLISHED = ['i3', 'SLIC', 'Surf', 'TDS']   # TDS: its own SalesRabbit company, crawled by grow-sync.mjs --tenant tds
+# ISPs the site shows. Lyte is drawn on its own serving areas (scripts/lyte-areas.py
+# rebuilds data/sectors/Lyte.csv from every drop file), doors it never listed grey.
+PUBLISHED = ['i3', 'SLIC', 'Surf', 'TDS', 'Lyte']   # TDS: its own SalesRabbit company, crawled by grow-sync.mjs --tenant tds
 OSM_TIMEOUT = 1200   # seconds the nightly run gives the road download before moving on
 
 # Talking to the page that frames this map (More > ISP Maps). The frame hands up a
@@ -62,7 +62,7 @@ const _rows = DATA.map(s => ({name: s.name, city: s.city, zone: s.zone, total: s
   // months old, because "days since knocked" is the middle door of the whole area.
   fresh: s.last, lately: (s.weeks || []).slice(-4).reduce((a, b) => a + b, 0),
   weeks: s.weeks || [], recent: s.recent || [], statuses: s.statuses || {}, poly: s.poly || [],
-  reps: (s.reps || []).slice().sort((a, b) => b[1] - a[1])}));
+  reps: (s.reps || []).slice().sort((a, b) => b[1] - a[1]), turf: s.turf || null}));
 if (window.parent !== window)
   try { parent.postMessage({type: 'growSectors', isp: META.isp, rows: _rows,
                             palette: {fresh: FRESH, rest: REST},
@@ -85,7 +85,10 @@ si = _load('sector_import', 'sector-import.py')
 
 def zone_name(sector):
     """The market an ISP sector belongs to: CHMPIL 166 -> CHMPIL, MRTNIL-1 -> MRTNIL,
-    TXFRSTAC001.SA02 -> TXFRSTAC001."""
+    TXFRSTAC001.SA02 -> TXFRSTAC001, Lake Jackson 2.01 -> Lake Jackson."""
+    m = re.match(r'^(.+?) \d+\.\d+[A-Z0-9]*$', sector)
+    if m:
+        return m.group(1)
     return re.split(r'[ \-.]', sector, 1)[0]
 
 
@@ -136,6 +139,10 @@ def label_point(g, xy):
     return max(shapely.get_parts(g), key=lambda q: q.area).point_on_surface()
 
 
+LONE_MAX = 3      # a cluster of fewer doors than this, 3 km from every other door, is a bad pin
+LOOSE_MIN = 5     # loose doors in a smaller bunch than this ...
+LOOSE_NEAR = 400  # ... within this many metres of an area's door join that area
+STRAY_DEG = 0.3   # about 30 km: further than this from its area's middle door, a door is a bad pin
 GROW_MIN = 20   # fewer doors than this left in a Grow sector: fold them into their neighbours
 
 
@@ -170,20 +177,40 @@ def isp_cut(isp):
         m = {(r['street_key'], r['zip']): r['sector'] for r in csv.DictReader(f)}
     doors = json.load(open(os.path.join(sb.CACHE, f'{isp}-doors.json')))
     grow_of, grow_zone = grow_fallback(isp)
+    # a door geocoded far from the rest of its area (a Baytown address pinned in the
+    # panhandle) would stretch that area across the state: it goes loose instead
+    at = collections.defaultdict(list)
+    for d in doors:
+        o = m.get((si.street_key(d['street']), d['zip']))
+        if o:
+            at[o].append(d)
+    stray = set()
+    for o, ds_ in at.items():
+        mla, mlo = np.median([d['lat'] for d in ds_]), np.median([d['lon'] for d in ds_])
+        stray |= {d['id'] for d in ds_ if abs(d['lat'] - mla) > STRAY_DEG or abs(d['lon'] - mlo) > STRAY_DEG}
     lat = np.array([d['lat'] for d in doors]); lon = np.array([d['lon'] for d in doors])
     # towns far apart are drawn separately, each in its own flat projection
     X = np.c_[lat * 111.0, lon * 111.0 * np.cos(np.radians(lat.mean()))]
     area = DBSCAN(eps=3.0, min_samples=1).fit_predict(X)
+    # a pin or two 3 km from any other door is not territory, it is a bad geocode: it
+    # comes off the map (and out of the door file, or build_map hangs it on the nearest area)
+    size = collections.Counter(area.tolist())
+    lone = {doors[i]['id'] for i in range(len(doors)) if size[int(area[i])] < LONE_MAX}
+    if lone:
+        json.dump([d for d in doors if d['id'] not in lone], open(os.path.join(sb.CACHE, f'{isp}-doors.json'), 'w'))
+        print(f'{isp}: {len(lone)} lone pins 3 km+ from any other door left off the map')
     sectors, zones, door_sec = {}, {}, {}
     no_sector_names = collections.Counter()
     matched = inside = loose = grown = 0
     for a in sorted(set(area.tolist())):
+        if size[a] < LONE_MAX:
+            continue
         idx = np.where(area == a)[0]
         ds = [doors[i] for i in idx]
         P = sb.Proj(float(lat[idx].mean()), float(lon[idx].mean()))
         dx, dy = P.fwd(lat[idx], lon[idx])
         xy = np.c_[dx, dy]
-        own = [m.get((si.street_key(d['street']), d['zip'])) for d in ds]
+        own = [None if d['id'] in stray else m.get((si.street_key(d['street']), d['zip'])) for d in ds]
         have = [i for i, o in enumerate(own) if o]
         matched += len(have)
         if have:
@@ -210,6 +237,20 @@ def isp_cut(isp):
                 own[i] = own[solid[int(near.nearest(Point(xy[i])))]]
         # what is still loose is grouped by town, then by clusters of houses 800 m apart
         rest = [i for i, o in enumerate(own) if not o]
+        # loose doors sitting just off an area's edge are that area's, not a grey island of
+        # their own: within LOOSE_NEAR of a door that has an area, they take its area,
+        # unless enough of them sit together to be a gap worth seeing
+        if rest and len(rest) < len(own):
+            lab = DBSCAN(eps=LOOSE_NEAR, min_samples=1).fit_predict(xy[rest]) if len(rest) > 1 else np.zeros(1, dtype=int)
+            n_lab = collections.Counter(lab.tolist())
+            has = [i for i, o in enumerate(own) if o]
+            near = shapely.STRtree([Point(xy[i]) for i in has])
+            for i, l in zip(rest, lab.tolist()):
+                if n_lab[l] < LOOSE_MIN:
+                    j = has[int(near.nearest(Point(xy[i])))]
+                    if np.hypot(*(xy[i] - xy[j])) <= LOOSE_NEAR:
+                        own[i] = own[j]; inside += 1
+            rest = [i for i, o in enumerate(own) if not o]
         loose += len(rest)
         by_city = collections.defaultdict(list)
         for i in rest:
@@ -263,6 +304,155 @@ def isp_cut(isp):
     print(f'{isp}: {n_isp} ISP sectors, {n_grow} Grow sectors, {len(zones)} zones; {matched:,} doors from the '
           f'sector file, {inside:,} more inside a sector shape, {grown:,} in a Grow sector, {loose:,} with no '
           f'sector in {len(sectors) - n_isp - n_grow} town groups')
+
+
+# ---------------------------------------------------------------- SalesRabbit's own areas
+
+SR_EXACT = {'Lyte'}
+GREY_MIN = 10        # undrawn doors: only bunches this big get a grey outline   # ISPs drawn exactly as the areas in SalesRabbit, not from their files
+
+
+def sr_areas(isp):
+    """Every area drawn in SalesRabbit (read only), cached so a failed fetch reuses the last."""
+    cache = os.path.join(sb.SECTORS, f'{isp}-sr-areas.json')
+    try:
+        H = json.load(open(os.path.join(ROOT, 'data', 'sr-auth.json')))['headers']
+        hdr = [x for k, v in H.items() for x in ('-H', f'{k}: {v}')]
+        out, off = [], 0
+        while True:   # curl, not urllib: python's certificates fail on this Mac
+            r = subprocess.run(['curl', '-sfg', '--max-time', '60', *hdr,
+                                f'https://apis.salesrabbit.com/areas?page[limit]=500&page[offset]={off}'],
+                               capture_output=True, text=True, check=True)
+            d = json.loads(r.stdout).get('data') or []
+            out += d
+            if len(d) < 500:
+                break
+            off += 500
+        json.dump(out, open(cache, 'w'))
+        return out
+    except Exception as e:
+        # never print the exception whole: a curl failure carries the auth header
+        print(f'{isp}: SalesRabbit areas fetch failed ({type(e).__name__}'
+              f'{" " + str(e.returncode) if hasattr(e, "returncode") else ""}), using the last copy')
+        return json.load(open(cache))
+
+
+def lyte_namer():
+    """A drawn area's title -> Lyte's name for it. Titles are bare numbers ("7.07", "2.04 A"),
+    so the town comes from the doors inside, and the name is only Lyte's ("Baytown 7.07")
+    when that FDH is on Lyte's tracker."""
+    la = _load('lyte_areas', 'lyte-areas.py')
+    code_of_city, town_of = collections.defaultdict(collections.Counter), {}
+    with open(os.path.join(sb.SECTORS, 'Lyte.csv'), newline='') as f:
+        for r in csv.DictReader(f):
+            m = la.FDH_RE.match(r['fdh'])
+            if m:
+                code_of_city[r['city'].upper()][m.group(1)] += 1
+                town_of[m.group(1)] = re.sub(r' \d+\.\d+\w*$', '', r['sector'])
+    code_of_city = {c: n.most_common(1)[0][0] for c, n in code_of_city.items()}
+    turf = json.load(open(os.path.join(sb.SECTORS, 'Lyte-turf.json')))['areas']
+    known = {t['FDH'] for t in turf.values()}
+    names = la.area_names(known, town_of)
+    towns = {t.upper() for t in town_of.values()}
+    def name(title, city):
+        # only a serving area number counts, alone or after a town ("1.01", "2.04 A",
+        # "Jeff 1.01"); rep areas ("Jeff 1", "Erik Juice", "Ben 10.4 7/28/26") do not
+        m = re.fullmatch(r'\s*(?:([A-Za-z][A-Za-z .]*?)\s+)?(\d{1,2}\.\d{1,2}\s?[A-Za-z]?\d?)\s*', title or '')
+        if not m or (m.group(1) and not any(t.startswith(m.group(1).upper().rstrip('.')) for t in towns)):
+            return None
+        title = m.group(2)
+        sh = la.shorthand(title)
+        code = code_of_city.get((city or '').upper())
+        if len(sh) == 1 and code:
+            f = la.resolve(code, (sh[0][0], sh[0][1], sh[0][2].replace(' ', '')), known)
+            if f:
+                return names[f]
+            return f'{town_of.get(code, city.title())} {title.strip()}'
+        return None
+    return name
+
+
+def sr_cut(isp):
+    """<ISP>-cut.json from the areas drawn in SalesRabbit, exactly as drawn: same outline,
+    same title, every door inside counted, so the map and SalesRabbit always agree. Doors in
+    no drawn area are grouped by town and drawn grey, as on the other maps."""
+    from sklearn.cluster import DBSCAN
+    doors = json.load(open(os.path.join(sb.CACHE, f'{isp}-doors.json')))
+    pts = shapely.points([(d['lon'], d['lat']) for d in doors])
+    tree = shapely.STRtree(pts)
+    namer = lyte_namer() if isp == 'Lyte' else (lambda t, c: None)
+    sectors, members, primary, zones = {}, {}, {}, {}
+    taken = collections.Counter()
+    kept = []
+    for a in sr_areas(isp):
+        at = a.get('attributes') or {}
+        rings = ((at.get('coordinates') or {}).get('coordinates') or [])
+        if not rings or len(rings[0]) < 3:
+            continue
+        g = shapely.make_valid(shapely.Polygon([(p[1], p[0]) for p in rings[0]], [[(p[1], p[0]) for p in r] for r in rings[1:]]))
+        hit = tree.query(g, predicate='contains')
+        if not len(hit):
+            continue
+        ds = [doors[i] for i in hit]
+        city = collections.Counter(d['city'] for d in ds).most_common(1)[0][0] or 'Unknown'
+        title = (at.get('title') or '').strip()
+        nm = namer(title, city)
+        if isp == 'Lyte' and not nm:
+            continue           # Lyte: only areas titled with a serving area number
+        nm = nm or title or f'{city} untitled'
+        taken[nm] += 1
+        if taken[nm] > 1:
+            nm = f'{nm} ({taken[nm]})'
+        rp = g.representative_point()
+        streets = collections.Counter(sb.door_street(d['street']).title() for d in ds)
+        zone = re.sub(r' \d+\.\d+\S*( \(\d+\))?$', '', nm) if re.search(r' \d+\.\d+', nm) else city
+        sectors[nm] = {'city': city, 'zone': zone, 'center': [round(rp.y, 6), round(rp.x, 6)],
+                       'poly': [[[[p[0], p[1]] for p in r] for r in rings]], 'streets': [x for x, _ in streets.most_common(4)],
+                       'source': 'sr', 'sr_id': a.get('id'), 'sr_title': title}
+        members[nm] = [d['id'] for d in ds]
+        zones.setdefault(zone, {'city': city, 'poly': [], 'center': None})
+        kept.append((g.area, nm, hit))
+    # a door in two drawn areas belongs, for the dots and the drop chip, to the smaller one
+    for _, nm, hit in sorted(kept, key=lambda k: -k[0]):
+        for i in hit:
+            primary[doors[i]['id']] = nm
+    # what nobody has drawn: grouped by town, then 800 m bunches, outlined grey
+    rest = [i for i, d in enumerate(doors) if d['id'] not in primary]
+    by_city = collections.defaultdict(list)
+    for i in rest:
+        by_city[doors[i]['city'] or 'Unknown'].append(i)
+    for city, mem in by_city.items():
+        lat = np.array([doors[i]['lat'] for i in mem]); lon = np.array([doors[i]['lon'] for i in mem])
+        P = sb.Proj(float(lat.mean()), float(lon.mean()))
+        xy = np.c_[P.fwd(lat, lon)]
+        lab = DBSCAN(eps=800, min_samples=1).fit_predict(xy) if len(mem) > 1 else np.zeros(1, dtype=int)
+        order = sorted(set(lab.tolist()), key=lambda l: -int((lab == l).sum()))
+        own = [None] * len(mem)
+        for k, l in enumerate(order, 1):
+            nm = f'{city} (no sector)' + (f' {k}' if k > 1 else '')
+            for j in np.where(lab == l)[0]:
+                own[j] = nm
+        n_own = collections.Counter(own)
+        for nm, g in outline_groups(xy, own).items():
+            js = [j for j, o in enumerate(own) if o == nm]
+            if n_own[nm] < GREY_MIN:     # a stray door or three is not a gap worth drawing
+                continue
+            lp = label_point(g, xy[js])
+            la_, lo_ = P.inv(lp.x, lp.y)
+            sectors[nm] = {'city': city, 'zone': '', 'center': [round(float(la_), 6), round(float(lo_), 6)],
+                           'poly': sb.to_latlon(g, P), 'streets': [], 'source': 'none'}
+            members[nm] = [doors[mem[j]]['id'] for j in js]
+            for j in js:
+                primary[doors[mem[j]]['id']] = nm
+    out = {'isp': isp, 'cut_on': datetime.date.today().isoformat(), 'source': 'salesrabbit', 'exact': True,
+           'zones': zones, 'sectors': sectors, 'doors': primary, 'members': members}
+    json.dump(out, open(os.path.join(sb.SECTORS, f'{isp}-cut.json'), 'w'))
+    drawn = sum(1 for v in sectors.values() if v['source'] == 'sr')
+    named = sum(1 for n, v in sectors.items() if v['source'] == 'sr' and re.search(r' \d+\.\d+', n))
+    grey = sum(len(members[n]) for n, v in sectors.items() if v['source'] == 'none')
+    print(f'{isp}: {drawn} SalesRabbit areas ({named} with a Lyte number), '
+          f'{len(doors) - len(rest):,} of {len(doors):,} doors inside one, {grey:,} grey in '
+          f'{len(sectors) - drawn} town groups, {len(rest) - grey:,} strays left off')
 
 
 # ---------------------------------------------------------------- viewer + upload
@@ -329,12 +519,17 @@ def upload(isp, payload, meta, source):
         sys.exit(f'no write key at {key_path} (see the sector_map_put function in Supabase)')
     body = json.dumps({'p_key': open(key_path).read().strip(), 'p_isp': isp, 'p_built': meta['built'],
                        'p_doors': meta['doors'], 'p_source': source, 'p_payload': payload})
-    r = subprocess.run(['curl', '-s', '-w', '\n%{http_code}', '-X', 'POST',
-                        f'{SUPA_URL}/rest/v1/rpc/sector_map_put',
-                        '-H', f'apikey: {SUPA_ANON}', '-H', f'Authorization: Bearer {SUPA_ANON}',
-                        '-H', 'Content-Type: application/json', '--data-binary', '@-'],
-                       input=body, capture_output=True, text=True)
-    if r.stdout.rsplit('\n', 1)[-1] not in ('200', '204'):
+    import time
+    for attempt in range(3):   # a busy database can time a 2 MB write out once (57014); the next try lands
+        r = subprocess.run(['curl', '-s', '-w', '\n%{http_code}', '-X', 'POST',
+                            f'{SUPA_URL}/rest/v1/rpc/sector_map_put',
+                            '-H', f'apikey: {SUPA_ANON}', '-H', f'Authorization: Bearer {SUPA_ANON}',
+                            '-H', 'Content-Type: application/json', '--data-binary', '@-'],
+                           input=body, capture_output=True, text=True)
+        if r.stdout.rsplit('\n', 1)[-1] in ('200', '204'):
+            return
+        time.sleep(15)
+    if True:
         sys.exit(f'upload {isp} failed: {r.stdout[:300]}')
 
 
@@ -387,6 +582,25 @@ def refresh_inputs():
         print('door file refresh failed, using the last one:', (r.stderr or r.stdout)[-300:])
 
 
+def drop_strays(isp):
+    """A few doors in a state the ISP does not serve (data/isps.json states) are bad pins
+    or rep typos, and one of them zooms the whole map out to the country: off the map."""
+    try:
+        states = set(json.load(open(os.path.join(ROOT, 'data', 'isps.json'))).get(isp, {}).get('states') or [])
+    except (OSError, ValueError):
+        return
+    if not states:
+        return
+    path = os.path.join(sb.CACHE, f'{isp}-doors.json')
+    doors = json.load(open(path))
+    # only a handful: i3 really works 4,690 Missouri doors outside its listed IL
+    n = collections.Counter((d.get('state') or '').upper() for d in doors)
+    keep = [d for d in doors if not d.get('state') or d['state'].upper() in states or n[d['state'].upper()] >= 20]
+    if len(keep) < len(doors):
+        json.dump(keep, open(path, 'w'))
+        print(f'{isp}: {len(doors) - len(keep)} doors outside {", ".join(sorted(states))} left off the map')
+
+
 def has_map(isp):
     return (os.path.exists(os.path.join(sb.SECTORS, f'{isp}.csv'))
             or os.path.exists(os.path.join(sb.SECTORS, f'{isp}-cut.json')))
@@ -400,16 +614,25 @@ def main():
     write_viewer()
     if '--no-extract' not in sys.argv and '--no-refresh' not in sys.argv:
         refresh_inputs()
+    live = []
     for isp in isps:
         if not has_map(isp):
             print(f'{isp}: no sector file and no cut yet, skipped'); continue
         if '--no-extract' not in sys.argv:
             sb.extract(isp)
+        drop_strays(isp)
         source = 'grow'
+        if isp == 'Lyte' and os.path.exists(os.path.join(sb.SECTORS, 'Lyte-turf.json')):
+            # Lyte's areas come from its drop files: re-read them so a new drop lands in its area
+            subprocess.run([sys.executable, os.path.join(ROOT, 'scripts', 'lyte-areas.py')], cwd=ROOT,
+                           stdout=subprocess.DEVNULL)
         if os.path.exists(os.path.join(sb.SECTORS, f'{isp}.csv')):
             if '--no-extend' not in sys.argv and os.path.exists(os.path.join(sb.SECTORS, f'{isp}-grow-cut.json')):
                 extend_grow_cut(isp)       # towns the ISP sent no sectors for
-            isp_cut(isp); source = 'isp'   # their sectors, rebuilt from their file
+            if isp in SR_EXACT:
+                sr_cut(isp); source = 'salesrabbit'   # exactly the areas drawn in SalesRabbit
+            else:
+                isp_cut(isp); source = 'isp'   # their sectors, rebuilt from their file
         elif '--no-extend' not in sys.argv:
             extend_cut(isp)
         sb.build_map(isp)
@@ -418,6 +641,10 @@ def main():
         payload = json.load(open(os.path.join(sb.MAPS, isp.lower(), 'data.json')))
         upload(isp, payload, payload['meta'], source)
         print(f'  {isp} is live on the Maps page')
+        live.append(isp)
+    if live:
+        # last line on purpose: the Wolf Office Mapper card shows it as its status
+        print(f'{len(live)} maps live: {", ".join(live)}')
 
 
 if __name__ == '__main__':

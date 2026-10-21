@@ -11,6 +11,7 @@ over from the previous owner (Josh) in October 2026. It is cloned to `~/Grow`.
 | `TrainingVideos/` | ffmpeg + whisper pipeline for training videos (`PIPELINE.md`). Footage lives on Drive, not in git |
 | `docs/knowledge/` | **How everything works and why.** Start at `docs/knowledge/README.md` |
 | `.claude/skills/` | The Grow skills (ISP lead files, Time Track, cancel lists, Terros, Sequifi roster check, training decks, leads dedupe) |
+| `PROCESSES.md` | **The process handoff, Oct 21 2026: one page, every routine, what is broken.** Read first |
 | `bootstrap.sh`, `HANDOFF.md` | Setting up a new Mac |
 
 ## First session on a new Mac

@@ -46,3 +46,7 @@ Machine-specific paths referenced elsewhere (recreate on the new machine): `~/Li
 - Browsers serve cached `index.html`; add `&cb=<n>` or you test the old build.
 - Browser-pane screenshots go blank when hidden; verify via DOM text.
 - Old Mac constraints (8 GB RAM, Desktop on iCloud) caused folder-picker hangs and 0-byte "dataless" files; keep the repo out of iCloud-synced folders on the new machine.
+- **New Mac (Oct 2026):** `bash scripts/install-all-agents.sh` installs the GrowSales launchd agents and the WolfOffice workers together (see syncs-and-schedules.md for the live list). Unloaded plists are parked in `~/Library/LaunchAgents/disabled-grow/`, not deleted.
+- **Retired API files** live in `GrowSales/backups/api-retired-20261014/` (`sync-watchdog.js`, `weekly-summary.js`, `vapid-public-key.js`, `_notify.js`); two live syncs still require `_notify.js` (see syncs-and-schedules.md). `vercel.json` crons list only bria-sync, sequifi-sync, sequifi-teams-sync.
+- Extra pages copied by build.sh since Oct 2026: `sources.js`, `money.html`, `quiz.html`, `calculator.html`, `maps/reps.html`, `maps/view.html`.
+- State on Oct 21 2026: 20 modified and 5 deleted files uncommitted on main (the deletions of ask / pronto / push endpoints are intentional); prod matches disk, not git.

@@ -1,10 +1,10 @@
 {
   "_readme": [
     "One entry per ISP we sell for that reports through Opendoor's RTR portal.",
-    "The key is the SOURCE TAG written onto every knocking row, so it must stay stable \u2014 renaming a key orphans that ISP's history.",
+    "The key is the SOURCE TAG written onto every knocking row, so it must stay stable — renaming a key orphans that ISP's history.",
     "",
     "reportPath  the folder + report inside the portal. Open the report in Chrome and copy the value of ?Path= from the URL.",
-    "supervisor  must match the Supervisor dropdown EXACTLY. Omit or null if that ISP's report has no Supervisor parameter \u2014 then every row it returns is taken.",
+    "supervisor  must match the Supervisor dropdown EXACTLY. Omit or null if that ISP's report has no Supervisor parameter — then every row it returns is taken.",
     "profile     optional. Omit to share .rtr-profile (one Opendoor login covering every ISP folder). Set it only if an ISP needs a separate login.",
     "dropdowns   optional. For reports scoped by cascading dropdowns instead of a Supervisor.",
     "            Each entry is {ctl, name, value} and they are applied IN ORDER, since each",
@@ -14,7 +14,7 @@
     "columns     optional. Exact CSV header names, for ISPs whose report is built differently. Anything omitted is guessed.",
     "",
     "ADDING AN ISP: add reportPath + supervisor, run `node scripts/rtr-sync.mjs --source <key> --dry`.",
-    "If the guesser can't find a column it prints the real header row and exits \u2014 paste those names into a columns block and re-run.",
+    "If the guesser can't find a column it prints the real header row and exits — paste those names into a columns block and re-run.",
     "",
     "Mirrors data/amplify-sources.json: untracked, lives beside it, same idea."
   ],
@@ -43,6 +43,15 @@
         "Detroit": "Michigan",
         "Albuquerque": "Albuquerque"
       }
+    },
+    "addresses": {
+      "_note": "Activity_Detail is per-knock with Ezee's own House/Street/City/Zip. Rendered once per team by ezee-addresses-sync.mjs (daily). Team names must match the Team dropdown exactly; a new Grow team on Ezee is a line here, not a code change.",
+      "reportPath": "/Ezee Fiber/Activity_Detail",
+      "teams": [
+        "Houston Contractor Team 5",
+        "Chicago Contractor Team 4",
+        "Detroit Contractor Team 1"
+      ]
     }
   },
   "bluepeak": {
@@ -54,7 +63,7 @@
       "column": "BU_Level_3",
       "value": "Grow Marketing"
     },
-    "_note": "Folder is still the pre-rebrand name VastBroadband. No Supervisor parameter on this report: it is scoped by the UserID/ReportByTypeID query params instead, and WITHOUT them it returns every business unit on the platform (verified 2026-08-18 \u2014 CSG rows came back). scope re-checks that in the CSV so a silently ignored param cannot widen the import. No raw contacts column either; it is derived from the full-precision rate in Textbox32 times ValidAttempts.",
+    "_note": "Folder is still the pre-rebrand name VastBroadband. No Supervisor parameter on this report: it is scoped by the UserID/ReportByTypeID query params instead, and WITHOUT them it returns every business unit on the platform (verified 2026-08-18 — CSG rows came back). scope re-checks that in the CSV so a silently ignored param cannot widen the import. No raw contacts column either; it is derived from the full-precision rate in Textbox32 times ValidAttempts.",
     "columns": {
       "rep": "D2DRep1",
       "date": "RecordDate1",
@@ -72,7 +81,7 @@
     "reportPath": "/Omni Fiber/Time_Track",
     "supervisor": null,
     "cadence": "daily",
-    "_note": "Scoped by two CASCADING dropdowns, not a Supervisor: Company must be set first because Region is empty until it posts back. Region left on 'All' returns every business unit on the platform (34 of them, incl. Omni's own internal teams and rival vendors like Embrase) \u2014 same trap as bluepeak, so scope re-checks it in the CSV. Data floor is 5/11/2026; our own activity is 6/18-8/7/2026. Columns confirmed 2026-08-21.",
+    "_note": "Scoped by two CASCADING dropdowns, not a Supervisor: Company must be set first because Region is empty until it posts back. Region left on 'All' returns every business unit on the platform (34 of them, incl. Omni's own internal teams and rival vendors like Embrase) — same trap as bluepeak, so scope re-checks it in the CSV. Data floor is 5/11/2026; our own activity is 6/18-8/7/2026. Columns confirmed 2026-08-21.",
     "dropdowns": [
       {
         "ctl": "ctl07",

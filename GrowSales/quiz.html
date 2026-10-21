@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Grow Money Quiz</title>
+<meta name="description" content="Find your investor type and your buying style.">
+<!-- Public quiz page for the money trainings. Two quizzes, one question at a
+     time, nothing leaves the device. ?q=investor (default) or ?q=buyer opens
+     one. Questions and result profiles are the originals from the 4-Year
+     Window course, verbatim; the scoring is the original too. Investor type
+     is the top count across eight answers. Buying style is the top of four
+     gut calls, with the goal question breaking a four way tie and the returns
+     question adding a lender note. Result is kept in localStorage so a rep
+     can come back to it. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f2f2ec;--card:#fff;--ink:#0b0c0b;--ink3:#48484a;--ink4:#86868b;
+  --line:rgba(60,60,67,0.12);--green:#178f3f;--lime:#34c759;--tint:#e6f4ea;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+[hidden]{display:none!important;}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+.hd{background:#000;color:#fff;padding:22px 18px 20px;}
+.hd-in,.wrap{max-width:460px;margin:0 auto;}
+.logo{height:26px;display:block;}
+.kick{color:var(--lime);font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;margin-top:20px;}
+.title{font-family:'Archivo Black',Impact,sans-serif;font-size:27px;line-height:1.02;text-transform:uppercase;margin-top:4px;}
+.seg{display:flex;background:#1c1c1e;border-radius:10px;padding:3px;margin-top:14px;}
+.seg button{flex:1;border:0;background:none;color:#b9bcb8;font-weight:600;font-size:14px;font-family:inherit;padding:8px;border-radius:8px;cursor:pointer;}
+.seg button.on{background:#fff;color:#000;}
+.wrap{padding:18px 14px 60px;}
+.meta{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--ink4);font-weight:600;margin-bottom:10px;}
+.meta button{background:none;border:0;color:var(--green);font:600 14px inherit;font-family:inherit;padding:4px 0;cursor:pointer;}
+.bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin-bottom:18px;}
+.bar i{display:block;height:100%;background:var(--green);transition:width .25s;}
+.q{font-size:19px;font-weight:700;line-height:1.3;margin:0 0 16px;}
+.intro{font-size:15px;color:var(--ink3);line-height:1.5;margin:0 0 18px;}
+.opt{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 16px;
+  margin-bottom:10px;font:500 16px inherit;font-family:inherit;color:var(--ink);cursor:pointer;line-height:1.35;}
+.opt:active{opacity:.7;}
+.opt .k{display:block;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink4);margin-bottom:5px;}
+.opt .t{display:block;font-weight:700;font-size:17px;margin-bottom:4px;}
+.opt .d{display:block;color:var(--ink3);font-size:14.5px;}
+.opt:focus-visible,button:focus-visible{outline:2px solid var(--green);outline-offset:2px;}
+.res{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 18px;box-shadow:0 2px 10px rgba(0,0,0,.06);}
+.tag{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--green);}
+.name{font-family:'Archivo Black',Impact,sans-serif;font-size:30px;line-height:1.05;text-transform:uppercase;margin-top:8px;}
+.name small{display:block;font-size:13px;color:var(--ink4);text-transform:none;font-family:inherit;margin-top:6px;}
+.lede{font-size:16px;color:var(--ink3);line-height:1.5;margin:12px 0 0;}
+h3{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink4);margin:22px 0 8px;}
+.res p{font-size:15.5px;line-height:1.5;color:var(--ink3);margin:0 0 10px;}
+.res p b{color:var(--ink);}
+.res ul{margin:0;padding-left:20px;}
+.res li{font-size:15.5px;line-height:1.5;color:var(--ink3);margin-bottom:8px;}
+.warn{background:var(--tint);border-radius:12px;padding:13px 14px;margin-top:8px;}
+.warn p{color:#0f3d1e;margin:0;}
+.mix{display:flex;border-radius:10px;overflow:hidden;margin:4px 0 6px;font-size:12px;font-weight:700;}
+.mix div{padding:11px 6px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.note{font-size:12.5px;color:var(--ink4);line-height:1.45;margin:0;}
+.lnk{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line);
+  text-decoration:none;color:var(--ink);font-size:15px;}
+.lnk b{display:block;font-weight:700;}
+.lnk span{display:block;color:var(--ink3);font-size:14px;margin-top:2px;}
+.lnk i{font-style:normal;color:var(--green);font-weight:700;flex:none;}
+.acts{display:flex;gap:10px;margin-top:18px;}
+.acts a,.acts button{flex:1;text-align:center;padding:13px;border-radius:12px;border:1px solid var(--line);background:#fff;
+  font:600 15px inherit;font-family:inherit;color:var(--ink);text-decoration:none;cursor:pointer;}
+.acts a.pri{background:#000;color:#fff;border-color:#000;}
+.fine{font-size:12px;color:var(--ink4);line-height:1.5;margin:22px 2px 0;text-align:center;}
+</style>
+</head>
+<body>
+<div class="hd"><div class="hd-in">
+  <img class="logo" src="/grow-wordmark.png" alt="Grow">
+  <div class="kick">Money</div>
+  <div class="title">Which one<br>are you</div>
+  <div class="seg" id="seg" role="tablist">
+    <button type="button" role="tab" data-q="investor">Investor type</button>
+    <button type="button" role="tab" data-q="buyer">Buying style</button>
+  </div>
+</div></div>
+<div class="wrap" id="app"></div>
+
+<script>
+(function(){
+  var INV_Q=[
+    { q:"A $12,000 commission lands tomorrow. What happens to it first?", o:[
+      ["Straight to savings before I can think about it",'saver'],
+      ["Split by percentages I already decided on",'indexer'],
+      ["Held for the next property down payment",'owner'],
+      ["Into whatever opportunity I am watching right now",'risk']] },
+    { q:"Your account drops 25% in a month. You:", o:[
+      ["Move it somewhere it cannot drop",'saver'],
+      ["Do nothing. It comes back.",'indexer'],
+      ["Remember why I prefer things I can see and touch",'owner'],
+      ["Buy more while it is cheap",'risk']] },
+    { q:"Which sentence sounds most like you?", o:[
+      ["I would rather earn 4% and sleep",'saver'],
+      ["Boring and automatic wins over clever",'indexer'],
+      ["I want to own things, not shares of things",'owner'],
+      ["Slow money is wasted time at my age",'risk']] },
+    { q:"How much time do you want to spend managing money each month?", o:[
+      ["Almost none. Set it and forget it.",'saver'],
+      ["An hour to check that the automation ran",'indexer'],
+      ["Whatever a property needs",'owner'],
+      ["As much as it takes to find the next move",'risk']] },
+    { q:"Someone offers you a deal you do not fully understand but the returns look excellent.", o:[
+      ["Hard pass",'saver'],
+      ["Pass, because I only buy what I can explain",'indexer'],
+      ["Depends entirely on what the asset is",'owner'],
+      ["I would put a small amount in to learn it",'risk']] },
+    { q:"Your four year target is closest to:", o:[
+      ["A paid-off life and no payments",'saver'],
+      ["A large invested balance that compounds without me",'indexer'],
+      ["Property that pays me every month",'owner'],
+      ["Enough capital to start something of my own",'risk']] },
+    { q:"Debt, honestly:", o:[
+      ["Something to eliminate and never repeat",'saver'],
+      ["Fine at a low rate, avoid the rest",'indexer'],
+      ["A tool when it buys something that pays for itself",'owner'],
+      ["Leverage. It is how you move faster.",'risk']] },
+    { q:"If commissions stopped for six months:", o:[
+      ["I would be fine. That is what the savings are for.",'saver'],
+      ["I would keep contributing at a lower rate",'indexer'],
+      ["Rent would cover more of my life than my job does",'owner'],
+      ["I would go find another way to make money",'risk']] }
+  ];
+  var INV_P={
+    saver:{ name:'The Saver',
+      tag:"Security first. You would rather have less and be certain than more and be exposed.",
+      str:["You will never blow up. The mistakes that end other people's four years do not happen to you.","Your emergency fund will actually exist, which quietly makes every other decision easier.","You are unusually good at not spending money, which is rarer and worth more than picking investments."],
+      blind:"Cash feels safe and loses to inflation every year you hold too much of it. The risk you're not counting is saving hard for four years and finishing with money that buys less than it did. A fully funded emergency fund and nothing invested is its own gamble at your age.",
+      goals:["Fund the reserve once, then stop adding to it and start investing the surplus","Automate a brokerage contribution so the decision is not made monthly","Pick one growth allocation you can hold through a 30% drop and leave it alone"],
+      mix:[['Cash and reserves',30],['Index funds',55],['Higher risk',15]] },
+    indexer:{ name:'The Indexer',
+      tag:"Systems over instinct. You want it automatic, low-fee, and unremarkable.",
+      str:["Automation means your plan survives a bad month, a good month, and a distracted month equally.","Low fees compound in your favor over 40 years more than most people believe.","You are not tempted by the things that cost other reps the most money."],
+      blind:"Automatic turns into unexamined. Four years is long enough for your income to triple while your contribution sits where you set it in month two. You're also likely to write off real estate on principle, and a house hack in your twenties is one of the few moves at your age where the downside is capped and the upside isn't.",
+      goals:["Raise the contribution every time income steps up, not once a year","Confirm the tax-advantaged accounts available to you are actually funded","Read module 06 with an open mind before ruling property out"],
+      mix:[['Cash and reserves',15],['Index funds',70],['Higher risk',15]] },
+    owner:{ name:'The Owner',
+      tag:"You want assets you can see. Property, equity, things with your name on them.",
+      str:["Real estate rewards patience and stomach, and you have both.","Leverage and forced appreciation are levers the stock market does not offer you.","You think in decades, which is the correct time horizon for what you are buying."],
+      blind:"Property is illiquid and lumpy, and commission income is too. Two lumpy things stacked on each other is how forced sales happen. The other risk is concentration: one property in one market is a bet on that market, and it takes years to unwind if you are wrong.",
+      goals:["Fund reserves separately from the down payment and never let them merge","Get the lender conversation and the CPA conversation aligned before you file","Keep a liquid position building alongside the property, not instead of it"],
+      mix:[['Cash and reserves',20],['Index funds',35],['Real estate',45]] },
+    risk:{ name:'The Risk Taker',
+      tag:"Speed over safety. You would rather aim high and miss than compound quietly.",
+      str:["Your ceiling is genuinely higher than everyone else's on this list.","You will act while other people research, and in some windows that is the whole advantage.","Comfort with volatility is a real edge if it sits on top of a foundation."],
+      blind:"The strategy that produces the biggest wins produces the biggest zeros, and a zero at 24 costs you the compounding on every dollar you would have had at 64. Leverage, concentration, and speed are the three ways reps lose everything, and you're drawn to all three. Be as aggressive as you want with money sitting on top of a funded base. Doing it instead of the base is a coin flip.",
+      goals:["Cap the speculative bucket at a percentage you set in advance and hold to it","Fund reserves and the boring allocation first, then be as aggressive as you want with the rest","Write down why you entered each position, so you can tell later whether you were right or lucky"],
+      mix:[['Cash and reserves',15],['Index funds',40],['Higher risk',45]] }
+  };
+  var BUY_FORCED=[
+    { tag:'1 of 6 · Gut call', prompt:"Two deals, and you can only close one this year.",
+      a:{k:'Deal A',t:'Cash Flow Now',d:"$400 a month starting day one. The location is nothing special, so don't expect much appreciation.",v:'cashflow'},
+      b:{k:'Deal B',t:'The Growth Bet',d:"Barely breaks even at $50 a month, but it's in a path-of-growth area you believe in.",v:'equity'} },
+    { tag:'2 of 6 · Gut call', prompt:"You've got $50K to put to work this year.",
+      a:{k:'Option A',t:'One Solid Deal',d:"All of it into one property. Average rate, average price, average cash flow. Safe and predictable.",v:'turnkey'},
+      b:{k:'Option B',t:'Split It Up',d:"Across 2 or 3 properties, each strong on one lever. More upside, more moving parts, less margin for error.",v:'scaler'} },
+    { tag:'3 of 6 · Gut call', prompt:"Two ways to spend the next six months.",
+      a:{k:'Path A',t:'Buy Something Decent Now',d:"Not the dream deal, but solid, and you own something six months from now.",v:'scaler'},
+      b:{k:'Path B',t:'Wait For Something Great',d:"You keep looking until the deal you actually want shows up, however long that takes.",v:'equity'} },
+    { tag:'4 of 6 · Gut call', prompt:"The inspection turns up a $5,500 AC replacement.",
+      a:{k:'Choice A',t:'Take The Deal Anyway',d:"The rate is good and a tenant is already paying. You eat the repair because the long-term math still works.",v:'cashflow'},
+      b:{k:'Choice B',t:'Pass, Find Turnkey',d:"You'd rather pay more every month for something move-in ready.",v:'turnkey'} }
+  ];
+  var BUY_STAND=[
+    { key:'goal', tag:'5 of 6 · Where you stand', prompt:"What's the goal for the first one?",
+      options:['A place to live','A rental that pays me','Both at once, live in one unit and rent the rest','Start of a portfolio I keep adding to'] },
+    { key:'returns', tag:'6 of 6 · Where you stand', prompt:"Two years of tax returns showing this income?",
+      options:['Yes, two full years filed','One year so far','This is my first year','Not sure what I have actually filed'] }
+  ];
+  var BUY_P={
+    cashflow:{ label:'Cash Flow Now', pairs:'Owner',
+      tag:'You optimize for what hits your account every month. The number you care about is what is left after the mortgage, taxes, insurance, and vacancy come out.',
+      how:"Cash flow buyers usually end up in small multifamily, 2 to 4 units, in markets where rent-to-price still pencils. The property does not have to be in a great area or appreciate much, it has to collect more than it costs every month for years. The tradeoff is that these are rarely the properties that double in value, and they take more management.",
+      start:["Underwrite for real: mortgage, taxes, insurance, vacancy, capex reserve, management. A deal that only works when nothing breaks is not a deal.","Rate matters more than sticker price. A good rate on an average property beats a good price at a bad rate over 30 years.","Small units in average areas beat single-family in great areas on this metric almost every time."],
+      watch:"Buying a cheap property in a market that is cheap for a reason. Rent that never rises and tenants who never pay will wipe out a spreadsheet that looked fine in year one.",
+      lessons:[['03','Taxes and the HYSA',"Rental income is 1099 income's cousin. If you are not already moving tax money out the day a check lands, a property makes that problem bigger."],['04','Paying off debt',"Every existing payment eats the cash flow you are buying the property for."],['06','Real estate',"Re-read the underwriting levers. Cash flow buyers get hurt by the line items they left out."]] },
+    equity:{ label:'Equity Builder', pairs:'Indexer',
+      tag:'You are playing the long game and you are fine being patient. You would rather own the right thing in the right place than collect $300 a month somewhere forgettable.',
+      how:"Equity buyers accept thin or zero cash flow in exchange for location and time. The return shows up as appreciation and loan paydown rather than monthly income, which means the property has to survive years of you covering shortfalls. The upside is that a property in a growing area can outperform every cash-flowing unit you would have bought instead.",
+      start:["Growth corridors are a bet on jobs, roads, and permits. Learn to read those instead of guessing which area feels nice.","Lock the best rate you can and leave it alone. This only works if you can hold through a bad stretch.","Put a date on how long you will wait. Patience is the strategy, but waiting quietly turns into never buying."],
+      watch:"Thin cash flow plus commission income is a rough combination. A slow winter, a vacant month, and a repair is how patient buyers get forced to sell early, which is the one thing this strategy cannot survive.",
+      lessons:[['01','The compounding math',"The same argument that makes early investing work is the one behind this strategy."],['05','Stocks',"Worth an honest comparison. If you want appreciation without tenants, an index fund does that with less work and more liquidity."],['09','Your four year plan',"Map what your expenses look like in a slow season before you commit to covering a shortfall."]] },
+    scaler:{ label:'The Scaler', pairs:'Risk Taker',
+      tag:'You would rather stack good deals than wait for one perfect one. Volume and momentum feel more real to you than optimization.',
+      how:"Scalers stop hunting for the property that has everything, great cash flow, great rate, great equity all at once, because those barely exist. Each deal is strong on one lever and average everywhere else, and the portfolio balances out. Equity gets manufactured through renovation and repositioning rather than waited for. Highest ceiling and highest failure rate of the four.",
+      start:["Buy in a sequence so each deal covers what the last one lacked. Write down what the next one needs to fix before you shop for it.","Manufacture equity with renovation and repositioning instead of waiting for the market to hand it to you.","Track everything on one balance sheet. Scalers who lose the whole picture find out two deals too late."],
+      watch:"Speed hides mistakes. Three mediocre deals bought fast are worse than one good deal bought slowly, and the leverage that makes this work is the same leverage that makes it break.",
+      lessons:[['02',"You're a business now","Entity structure stops being optional past one property. Get it right before deal two, not after deal four."],['04','Paying off debt',"Know the difference between debt that buys an income stream and debt that buys a lifestyle."],['09','Your four year plan',"Run your numbers at the aggressive end and the honest end. The gap is your reserve requirement."]] },
+    turnkey:{ label:'The Turnkey Buyer', pairs:'Saver',
+      tag:'You want it done right, without managing chaos. Simple and predictable beats optimized and stressful.',
+      how:"Turnkey buyers pay closer to full price for a property that needs nothing, use traditional financing, and accept a lower return in exchange for fewer surprises. Complexity is not a requirement for a good deal, and the first property you actually close beats the four you researched and passed on.",
+      start:["Filter hard for move-in ready and let the seller absorb the renovation risk.","Get pre-approved early so you can move when the right property shows up instead of scrambling.","Leave room for one nice-to-have. These properties exist, there are just fewer of them and they cost more."],
+      watch:"The quiet cost is the premium you pay for someone else's work. Paying full price for a finished property in a hot market is the easiest way to end up with no equity and no cash flow at once.",
+      lessons:[['02',"You're a business now","Traditional lenders want clean books and filed returns. Structure decides what a lender sees."],['03','Taxes and the HYSA',"Your down payment lives here until you buy. Liquid, boring, and untouched."],['05','Stocks',"If a property will not pencil for a year or two, this is where the down payment fund keeps working."]] }
+  };
+
+  var QUIZ={
+    investor:{
+      intro:"Eight questions on temperament. There is no best result, and every type has a way it wins and a way it gets hurt. Answer with what you would actually do, not what the quiz seems to want.",
+      n:INV_Q.length
+    },
+    buyer:{
+      intro:"Six questions. Four are gut calls between two deals, two are about where you actually stand. This measures temperament, not readiness, and it is not a recommendation to buy anything.",
+      n:BUY_FORCED.length+BUY_STAND.length
+    }
+  };
+  // which section of the money guide each original module maps to
+  var MOD={'01':'/money.html#investing','02':'/money.html#s-corp-how','03':'/money.html#tax','04':'/money.html#e-fund',
+           '05':'/money.html#investing','06':'/money.html#real-estate','09':'/calculator.html?c=invest'};
+  var STORE='grow_quiz_v1';
+  var app=document.getElementById('app');
+  var which='investor',step=0,ans=[],done={};
+  var $=function(id){return document.getElementById(id);};
+  var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+
+  try{done=JSON.parse(localStorage.getItem(STORE)||'{}')||{};}catch(e){done={};}
+  try{var w=new URLSearchParams(location.search).get('q');if(w==='buyer'||w==='investor')which=w;}catch(e){}
+
+  function seg(){
+    [].forEach.call($('seg').children,function(b){
+      var on=b.dataset.q===which;b.className=on?'on':'';b.setAttribute('aria-selected',on?'true':'false');
+    });
+  }
+
+  function question(){
+    var n=QUIZ[which].n,h='';
+    h+='<div class="meta"><span>'+(step+1)+' of '+n+'</span>'+(step>0?'<button type="button" id="back">Back</button>':'')+'</div>';
+    h+='<div class="bar"><i style="width:'+Math.round(step/n*100)+'%"></i></div>';
+    if(step===0)h+='<p class="intro">'+esc(QUIZ[which].intro)+'</p>';
+    if(which==='investor'){
+      var q=INV_Q[step];
+      h+='<p class="q">'+esc(q.q)+'</p>';
+      q.o.forEach(function(o){h+='<button type="button" class="opt" data-v="'+esc(o[1])+'">'+esc(o[0])+'</button>';});
+    }else if(step<BUY_FORCED.length){
+      var f=BUY_FORCED[step];
+      h+='<p class="q">'+esc(f.prompt)+'</p>';
+      ['a','b'].forEach(function(s){var c=f[s];
+        h+='<button type="button" class="opt" data-v="'+esc(c.v)+'"><span class="k">'+esc(c.k)+'</span><span class="t">'+esc(c.t)+'</span><span class="d">'+esc(c.d)+'</span></button>';});
+    }else{
+      var s=BUY_STAND[step-BUY_FORCED.length];
+      h+='<p class="q">'+esc(s.prompt)+'</p>';
+      s.options.forEach(function(o){h+='<button type="button" class="opt" data-v="'+esc(o)+'">'+esc(o)+'</button>';});
+    }
+    app.innerHTML=h;
+    window.scrollTo(0,0);
+  }
+
+  function scoreInvestor(a){
+    var t={saver:0,indexer:0,owner:0,risk:0};
+    a.forEach(function(k){t[k]++;});
+    return Object.keys(t).sort(function(x,y){return t[y]-t[x];})[0];
+  }
+  function scoreBuyer(a){
+    var v={cashflow:0,equity:0,scaler:0,turnkey:0};
+    a.slice(0,4).forEach(function(k){v[k]++;});
+    var goal=a[4],ret=a[5];
+    var max=Math.max.apply(null,Object.keys(v).map(function(k){return v[k];}));
+    var top=Object.keys(v).filter(function(k){return v[k]===max;});
+    if(top.length===4)top=[goal==='Start of a portfolio I keep adding to'?'scaler':goal==='A place to live'?'turnkey':'equity'];
+    return {key:top[0],second:top[1]||null,ret:ret};
+  }
+
+  function result(){
+    var h='',r;
+    if(which==='investor'){
+      var key=scoreInvestor(ans),p=INV_P[key];
+      r={key:key};
+      var shades=['#0b0c0b','#86868b','#e6f4ea'],fgs=['#fff','#fff','#0f3d1e'];
+      h+='<div class="res"><div class="tag">Your investor type</div><div class="name">'+esc(p.name)+'</div>'+
+         '<p class="lede">'+esc(p.tag)+'</p>'+
+         '<h3>What this gets right</h3><ul>'+p.str.map(function(s){return '<li>'+esc(s)+'</li>';}).join('')+'</ul>'+
+         '<h3>Your blind spot</h3><div class="warn"><p>'+esc(p.blind)+'</p></div>'+
+         '<h3>First twelve months</h3><ul>'+p.goals.map(function(s){return '<li>'+esc(s)+'</li>';}).join('')+'</ul>'+
+         '<h3>An illustrative shape</h3><div class="mix">'+p.mix.map(function(m,i){return '<div style="flex:'+m[1]+';background:'+shades[i]+';color:'+fgs[i]+'">'+esc(m[0])+' '+m[1]+'%</div>';}).join('')+'</div>'+
+         '<p class="note">How this temperament tends to allocate, not a recommended allocation. Your own mix depends on your income, obligations, and timeline, and it is a conversation for a licensed advisor.</p>'+
+         '<h3>Read next</h3>'+
+         '<a class="lnk" href="/calculator.html?c=invest"><div><b>Run your numbers</b><span>What four years of setting aside produces at your deal count.</span></div><i>Go</i></a>'+
+         '<a class="lnk" href="/quiz.html?q=buyer"><div><b>Buying style</b><span>Which property deals you are drawn to, if real estate is on the list.</span></div><i>Go</i></a>'+
+         '</div>';
+    }else{
+      var s=scoreBuyer(ans),p=BUY_P[s.key],sec=s.second?BUY_P[s.second]:null;
+      r={key:s.key,second:s.second};
+      var note='';
+      if(s.ret==='This is my first year'||s.ret==='One year so far'){
+        note='Most conventional lenders want two years of filed returns on self employment income. Until you have them your options are a larger down payment, a co borrower, a bank statement loan at a worse rate, or waiting. Knowing which one you are planning on is the difference between a plan and a hope.';
+      }else if(s.ret==='Not sure what I have actually filed'){
+        note='Start by finding out what you have actually filed. Lenders read returns, not commission statements, and the write offs that cut your tax bill also cut the income a lender will count.';
+      }
+      h+='<div class="res"><div class="tag">Your buying style</div><div class="name">'+esc(p.label)+(sec?'<small>Close second: '+esc(sec.label)+'</small>':'')+'</div>'+
+         '<p class="lede">'+esc(p.tag)+'</p>'+
+         '<h3>How this usually works</h3><p>'+esc(p.how)+'</p>'+
+         '<h3>Where you would start</h3><ul>'+p.start.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>'+
+         '<h3>Your blind spot</h3><div class="warn"><p>'+esc(p.watch)+'</p></div>'+
+         (sec?'<h3>You are a blend</h3><p>You lean '+esc(sec.label)+' about as hard. That is workable, but pick which one the first property is for. Trying to satisfy both usually produces a deal that does neither well.</p>':'')+
+         (note?'<h3>Your returns</h3><div class="warn"><p>'+esc(note)+'</p></div>':'')+
+         '<h3>How this connects to investor type</h3><p>Buying style is not the same as investor type. This one says which property deals you are drawn to. The investor quiz says how you treat money generally. '+esc(p.label)+' usually pairs with <b>'+esc(p.pairs)+'</b> there, and if yours comes back different, that gap is worth understanding rather than resolving.</p>'+
+         '<h3>Read next</h3>'+
+         p.lessons.map(function(l){return '<a class="lnk" href="'+(MOD[l[0]]||'/money.html')+'"><div><b>'+esc(l[1])+'</b><span>'+esc(l[2])+'</span></div><i>Go</i></a>';}).join('')+
+         '<p class="note" style="margin-top:14px">This measures temperament, not readiness. It tells you which deals you will be drawn to and which risks you will underrate. It says nothing about whether you should buy anything, and it is not a recommendation to.</p>'+
+         '</div>';
+    }
+    h+='<div class="acts"><button type="button" id="again">Retake</button><a class="pri" href="/money.html">Back to the guide</a></div>';
+    app.innerHTML=h;
+    done[which]={answers:ans.slice(),result:r};
+    try{localStorage.setItem(STORE,JSON.stringify(done));}catch(e){}
+    window.scrollTo(0,0);
+  }
+
+  function start(){
+    seg();
+    var d=done[which];
+    if(d&&d.answers&&d.answers.length===QUIZ[which].n){ans=d.answers.slice();result();return;}
+    step=0;ans=[];question();
+  }
+
+  document.addEventListener('click',function(e){
+    var b=e.target.closest('button');if(!b)return;
+    if(b.dataset.q){
+      which=b.dataset.q;
+      try{var u=new URL(location.href);u.searchParams.set('q',which);history.replaceState({},'',u);}catch(_){}
+      start();return;
+    }
+    if(b.classList.contains('opt')){
+      ans[step]=b.dataset.v;step++;
+      if(step>=QUIZ[which].n)result();else question();
+      return;
+    }
+    if(b.id==='back'){step=Math.max(0,step-1);ans.length=step;question();return;}
+    if(b.id==='again'){delete done[which];try{localStorage.setItem(STORE,JSON.stringify(done));}catch(_){}step=0;ans=[];question();}
+  });
+
+  start();
+})();
+</script>
+<p class="fine" style="max-width:460px;margin:0 auto;padding:0 14px 40px">Education only. Not financial, tax, investment, or legal advice. Nothing you answer leaves this device.</p>
+</body>
+</html>

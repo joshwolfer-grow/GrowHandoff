@@ -65,6 +65,12 @@ const PROFILES = {
     order: 'Customer Number', status: 'Status', name: 'Customer Name', phones: ['phone number'],
     area: 'Market', sold: 'Date of Sign Up', notes: ['Disposition', 'Reason', 'Detail:Reason For Cancelation'], date: 'Date of Cancel',
   },
+  // TDS "Grow Cancel Report": street, city and state in their own columns, no zip.
+  tds: {
+    order: 'ORDER_NUMBER', name: 'CUSTOMER_NAME', email: 'Email', phones: ['Contact TN'],
+    address: 'ADDRESS_LINE', city: 'CITY', state: 'STATE', area: 'CITY',
+    sold: 'ORDER_CREATE_DATE', notes: 'Cancel reason', date: 'CANCELLED_DATE',
+  },
 };
 // A slug can have several layouts: take the first profile whose order column is in the file.
 const profileFor = (head) => Object.entries(PROFILES).find(([k, p]) => (k === slug || k.startsWith(slug + '_')) && head.includes(p.order))?.[1];
@@ -158,7 +164,7 @@ async function main() {
   for (const r of rows) {
     const order = r[P.order]; if (!order) continue;
     const id = `${slug}:${order}`; if (ids.has(id)) { stats.dupes++; continue; } ids.add(id);
-    const a = splitAddress(P.address ? r[P.address] : '');
+    const a = P.city ? { street: r[P.address] || '', city: r[P.city] || '', state: (r[P.state] || '').toUpperCase().slice(0, 2), zip: '' } : splitAddress(P.address ? r[P.address] : '');
     const rawNotes = Array.isArray(P.notes) ? [...new Set(P.notes.map((h) => r[h]).filter((v) => v && !/^#(N\/A|REF!)$/.test(v)))].join(' · ') : r[P.notes];
     const { notes, extraPhone } = cleanNotes(rawNotes);
     const phones = [...new Set([...P.phones.map((h) => ph10(r[h])), extraPhone].filter(Boolean))];

@@ -1195,13 +1195,19 @@ def lead_drops(isp, doors):
 def build_map(isp):
     doors = json.load(open(os.path.join(CACHE, f'{isp}-doors.json')))
     cut_ = json.load(open(os.path.join(SECTORS, f'{isp}-cut.json')))
-    extra = assign_new(doors, cut_)
+    extra = {} if cut_.get('exact') else assign_new(doors, cut_)   # exact: rebuilt every run, a door outside it stays off
     sec_of = dict(cut_['doors']); sec_of.update(extra)
     today = TODAY.toordinal()
     groups = collections.defaultdict(list)
     for d in doors:
         if d['id'] in sec_of:
             groups[sec_of[d['id']]].append(d)
+    # an exact cut (SalesRabbit's own areas, sector-maps.py sr_cut) counts every door inside
+    # an area's outline, the way SalesRabbit does, so a door in two drawn areas counts in both
+    if cut_.get('members'):
+        by_id = {d['id']: d for d in doors}
+        groups = collections.defaultdict(list, {n: [by_id[i] for i in ids if i in by_id]
+                                                for n, ids in cut_['members'].items()})
     drops = lead_drops(isp, doors)
     drop_of = {}           # door id -> index into drops
     for d in doors:
@@ -1212,7 +1218,8 @@ def build_map(isp):
                     drop_of[d['id']] = j; break
     stages = sorted({d['stage'] for d in doors if d['stage']})
     HP = Proj(float(np.mean([d['lat'] for d in doors])), float(np.mean([d['lon'] for d in doors])))
-    shapes = clean_shapes({n: groups.get(n, []) for n in cut_['sectors']}, HP)
+    # exact cuts keep the drawn outline; everything else is redrawn clean around its doors
+    shapes = {} if cut_.get('exact') else clean_shapes({n: groups.get(n, []) for n in cut_['sectors']}, HP)
     sidx = {s: i for i, s in enumerate(stages)}
     week0 = sunday(TODAY - datetime.timedelta(weeks=25)).toordinal()
     data = []
@@ -1283,6 +1290,16 @@ def build_map(isp):
             'statuses': dict(st.most_common()), 'reps': reps,
             'born': born if born >= 0 else None, 'adds': {str(j): n for j, n in sorted(adds.items())},
         })
+    if cut_.get('exact'):   # drawn areas overlap: biggest first, so the small ones sit on top and take the click
+        data.sort(key=lambda s: -sum(shapely.Polygon([(b, a) for a, b in p[0]]).area for p in s['poly'] if len(p[0]) > 2))
+    # an ISP's own read of each area (Lyte's turf tracker, scripts/lyte-areas.py), shown
+    # on the area as their sheet has it
+    turf_path = os.path.join(SECTORS, f'{isp}-turf.json')
+    turf = json.load(open(turf_path)) if os.path.exists(turf_path) else None
+    if turf:
+        for s in data:
+            if s['name'] in turf['areas']:
+                s['turf'] = turf['areas'][s['name']]
     # a colour per sector, never shared with a sector it touches
     geoms = []
     for s in data:
@@ -1316,6 +1333,7 @@ def build_map(isp):
     meta = {'isp': isp, 'built': TODAY.isoformat(), 'cut_on': cut_['cut_on'], 'stages': stages, 'zones': zones,
             'week0': datetime.date.fromordinal(week0).isoformat(), 'doors': len(pts),
             'new_since_cut': len(extra),
+            'turf': {'asof': turf['asof'], 'tab': turf['tab']} if turf else None,
             'drops': [{'date': datetime.date.fromordinal(x['lo']).isoformat(),
                        'to': datetime.date.fromordinal(x['hi']).isoformat(), 'doors': x['n'], 'files': x['files'],
                        'new': [s['name'] for s in data if s['born'] == j],

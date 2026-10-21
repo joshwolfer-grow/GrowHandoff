@@ -103,6 +103,26 @@ If the layout is new, adapt with lead-import.py's flags (`--notes-from`,
 `--status-from`, `--name`) rather than editing the script mid-run. If it truly
 can't be parsed, say so and stop; don't force it.
 
+## 1b. Surf files (MBS Status column): the fixed recipe
+
+Surf sends `Record ID, First Name, Last Name, MBS Status (Text), Street Address, ...`.
+Do exactly this every time, the way Rock Falls (9 29 and 10 5) and Muncie went:
+
+1. Copy the original to `Surf/Raw/<date> <name>` as it arrived.
+2. In a scratchpad copy: rename `Street Address` → `Address`; add `Stage` from MBS
+   Status: Active/Pending/TempDeactive → Current Customer, PermDeactive/Canceled →
+   Previous Customer, blank → New Lead.
+3. **Sort Current Customer rows first, then Previous, then blank.** lead-import keeps
+   the first row per address; skip this and ~200 customers go in as New Lead.
+4. Fill blank zips with the town's zip, drop out-of-town billing rows and junk.
+5. `lead-import.py <copy> --assign "<rep>" --status-from Stage --name "SURF-<CODE> (<m d>)"`,
+   then write the csv with isp-intake's `write_csv` to `imports/isp/ready/` and
+   `Surf/Imports/`, the dupes report into `Surf/Raw/`.
+6. Report first: "<raw> rows = <houses> houses" (the repeats are past account holders
+   plus a Current Resident row per house), then new/in SR/dropped and the stage counts.
+   The format is the standard SR template; say it matches the last Surf import.
+   Hand both files over with SendUserFile.
+
 ## 2. Sectors, if present
 
 ```bash

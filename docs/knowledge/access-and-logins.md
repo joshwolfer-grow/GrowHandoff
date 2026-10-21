@@ -6,7 +6,7 @@
 |---|---|---|
 | Corporate / admin | access code (role corporate) or email login with `app_users` role corporate | everything |
 | Managers | scoped access code (role manager, since Sep 12 2026) or email login (leaders, Sep 16 2026) | only pages ticked for them, team-scoped |
-| Cancel callers | access code role `caller` (own assigned leads) or `caller_lead` (everyone's, Assign tab) | Callbacks page only; dashboard data never fetched |
+| Callers (label was "Cancel callers" until Oct 7 2026) | access code role `caller` (own assigned leads) or `caller_lead` (everyone's, Assign tab) | Cancel Center Today (caller), + Reports (caller_lead), and the Deal Check queue behind a "Cancel calls / Deal check" switch; dashboard data never fetched |
 | Reps | nobody. All 70 rep and 19 manager codes were DISABLED (not deleted) Sep 11 2026; rep codes stay off; "NO reps will ever be on this" | Bria serves reps |
 
 ## Access codes
@@ -18,7 +18,8 @@
 - Rotating a code: `upsert_access_code` keeps the old code for the same name+role, so rotating means a new name (e.g. a new "<Name> W" entry) and disabling the old one.
 - Codes are short (5 chars) and redeem has no rate limit.
 - Live callers as of Sep 2026: Spencer Ales (caller_lead), Trevor Prince (caller).
-- The daily manager-text job signs in with a corporate access code stored in `RepText/.env` (see reports-emails-texts.md).
+- The daily manager-text job signed in with a corporate access code stored in `RepText/.env` (see outbound-comms.md). That code was deactivated by late Sep 2026 (only the corporate code named "Admin" is active), which silently broke the job until it was unloaded Oct 14. Any headless job that signs in needs a code that is still in `access_codes`; `scripts/verify-metrics.mjs` avoids this by answering `redeem_access_code` locally.
+- Manager Standards RPCs (Oct 8 2026) reuse `_is_corp_admin` for the corporate-only writes; see dashboard-app.md.
 
 ## Manager scoping (Sep 12 2026)
 

@@ -154,6 +154,13 @@ def sectors_for(isp, sel, min_cover=0.5):
     m = map_sectors(isp)
     if m:
         return m
+    # "sectors": "city" keeps an ISP's workbook by city even with a full sector file:
+    # Lyte's file feeds its map, the workbook it gets stays as it was
+    try:
+        if json.load(open(ISPS)).get(isp, {}).get('sectors') == 'city':
+            return {}
+    except (OSError, ValueError):
+        pass
     m = load_sectors(isp)
     if not m or not sel:
         return m

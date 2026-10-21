@@ -10,6 +10,7 @@
 - **Two different clawbacks, never sum them.** Weekly reconciliation = a deal paid off Bria that the install report never confirms (happens to green reps too). Tier chargeback = reversal of everything paid across the yellow run, only on red. Cancels alone never claw.
 - Export to Sequifi keeps exactly 6 columns: `Payouts, Start Date, End Date, Deals, Upfront Pay, Note`; numeric amounts (no "$1,200" strings); a rep coming off gets one negative row with Start Date = first yellow week (`_ufExportChargebacks`).
 - Opt-in list: `upfront_optin` table (synced from the "upfront pay reps" tab of a Google Sheet owned by someone else); `active_date`/`end_date` columns. Six reps dropped off on expired `end_date` while still selling (Sep 2026); check the sheet's End date before calling it underpayment.
+- **Opt-in spelling wins by email (Oct 13 2026, deployed):** `_canonRowsByEmail(deals, lists, optin)` takes the opt-in rows; for an opted-in rep the opt-in sheet's spelling (matched by its `email` column) is the canonical name everywhere, because payroll, `upfront_paid`, tiers and the Sequifi export key on it. Fixed Leon Fitarau (report "Leon Fiataru", 13 deals paid $0), Colette/Collette Morell (49), Julian/Juilan Chavez (8); aliases `leon fiataru`, `collette morell` added (how='report'). Open: Caden Meese vs "Cade Meese".
 
 ## Source rule (Sep 10 2026, owner's words)
 
@@ -45,6 +46,13 @@
 Payroll rail item → Upfront: Status tab (rep-facing tiers) and Pay & Reconcile (`_ufMode` 'payrecon', 1-2-3 ritual strip `window._ufStepsStrip`). One table grouped (pay this week | last-week Bria | last-week report), click to expand deals. Selected rep card: "Deals paid this week" block (one line per `payMerged` deal with Report/Bria pill `.ufd-src`) then "Weekly reconciliation" that buckets every last-week Bria row (presales in report · same deal as a standard report deal · no install date/placeholder · paid from Bria) and says where the report filed each unconfirmed row (`gapDeals[].reportSd`). Week-strip cards show net payable from `computePayrun(n)`. Do not bring back a week-wide "Deals paid this run" table. Paid checkboxes and Close pay run persist to `upfront_paid` (pay_week, rep) and `upfront_pay_runs` (`api/upfront-paid.sql`). `__payroll_code__` is a client-side pay-run confirm. ~26% of opted-in Bria deals have placeholder customer names ("Past Sale"), bucketed separately.
 
 Test pay logic with a Node harness that lifts functions out of index.html (seed `window._ufPaid={}` etc. first; `_ufPayrunHtml` reads `window._ufPaid` unguarded). Drive the real UI via `window._grow.oms('upfront')`.
+
+## Ramp bonus (first worked weeks; decided Oct 20 2026)
+
+- Idea: pay new reps a ramp bonus over their first weeks so they ramp fast, then hand them to managers. **The ramp clock counts WORKED weeks, not calendar weeks**: a qualifying week = 4 or more days of more than 10 doors, inside an 8 calendar-week window; the ramp is 4 worked weeks. Reps knock in bursts, so a calendar clock showed median 0 worked days by week 3 even for stayers.
+- Baseline (cohort Feb to Jul 2026 starts, 255 reps, computed Oct 20): 96 worked one week only, 38 reached 8+ worked weeks; stayers' PRA goes ~1.0 to ~1.9 by worked week 5; week-1 stats do not predict who stays; week 1 to 2 deals install at ~0.45 vs 0.7+ later. Numbers in `GrowSales/docs/ramp-bonus-baseline.md`.
+- Built Oct 20 2026: **Ramp strip on the rep snapshot** (`api/weekly-rep-email.js` `buildRamp` / `rampHtml`, `RAMP` config, section key `ramp`) reading the `rep_ramp_weeks` view (`api/ramp-schema.sql`). The strip hides 4 weeks after graduation or close. **Pay amounts $100 base / $200 stretch / $300 graduation are PLACEHOLDERS** the owner never set. Pay would follow the upfront model (on installs, 90-day hold). Uses the true-PRA day rule.
+- Rendering the email module locally needs the anon key from index.html plus a WebSocket stub on Node 20 (`.env.local` / `.env.prod` have blank Supabase values).
 
 ## Bonus
 

@@ -27,8 +27,11 @@
 // Trigger: Vercel cron (see vercel.json) sends `Authorization: Bearer <CRON_SECRET>`.
 // Manual run: GET /api/bria-sync?key=<CRON_SECRET>  (same secret, as a query param).
 
-import notify from './_notify.js';
 import { canonicalDisplayName } from './_name-aliases.js';
+// Alerts used to go through api/_notify.js (removed Sep 16 2026 with the Flags
+// page). Keep the call sites, log instead: a guard that fires must never crash
+// the function with "notify is not defined" (it did on Oct 16 2026).
+const notify = { notifyPush: async (m) => { console.warn('[bria-sync alert]', m.title, m.body); } };
 
 const NEW_BRIA = !!(process.env.BRIA_SUPABASE_READONLY_KEY || '').trim();
 const BRIA_BASE = (NEW_BRIA
@@ -37,6 +40,10 @@ const BRIA_BASE = (NEW_BRIA
 const BRIA_REST = `${BRIA_BASE}/rest/v1`;
 const BRIA_AUTH = `${BRIA_BASE}/auth/v1`;
 const CUTOVER = NEW_BRIA ? (process.env.BRIA_CUTOVER || '2026-05-01').trim() : null;
+// Grow's company on the new Bria. The read-only role sees every company, and
+// on Oct 14 2026 Bria added a demo company (Demo Falcons / Harbor / Summit,
+// 3,105 fake sales) that landed in PRA and the leaderboard two days later.
+const BRIA_COMPANY_ID = (process.env.BRIA_COMPANY_ID || 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1').trim();
 const PAGE = 1000;
 
 // Resolve Bria credentials into { apikey, bearer } used on every REST request.
@@ -432,6 +439,36 @@ export function buildBriaRoster(dealRows, teams, memberRows, startDay, today, bl
   return { weeks, teams: meta, start_week: start, market_teams: [...mkt].filter((m) => !(blitz && blitz.managers && blitz.managers.has(m))).sort() };
 }
 
+// ---- Bria entries to ignore ------------------------------------------------
+// Deals keyed into Bria under the wrong rep, held out until Bria is cleaned up.
+// Applied here, once, so bria_deals and bria_sales_daily are already clean for
+// every reader (dashboard, rep email, deck script). Each entry comes off the
+// rep's bria_deals rows and their bria_sales_daily count for that day; only
+// what is still in Bria is removed, so a later Bria cleanup is not taken off
+// twice. Names are matched case and whitespace insensitive, after canonicalRepNames.
+export const BRIA_EXCLUDE = [
+  // Oct 3 2026: also under Kanyon in Bria, Sequifi credits Reuben Dodson
+  { rep: 'will gabor', date: '2026-10-03', customers: ['cecile barren', 'joe casteel', 'jennifer kraft', 'bill gerakaris', 'jeff lawson'] },
+];
+export function applyBriaExclude(dealRows, salesRows) {
+  const lc = (v) => String(v || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  let dropped = 0;
+  for (const x of BRIA_EXCLUDE) {
+    let hit = 0;
+    for (let i = dealRows.length - 1; i >= 0; i--) {
+      const r = dealRows[i];
+      if (lc(r.rep) === x.rep && r.sale_date === x.date && x.customers.includes(lc(r.customer))) { dealRows.splice(i, 1); hit++; }
+    }
+    if (!hit) continue;
+    dropped += hit;
+    for (const r of salesRows) {
+      if (lc(r.rep) === x.rep && r.sale_date === x.date) r.deals = Math.max(0, (r.deals || 0) - hit);
+    }
+  }
+  if (dropped) console.log('bria exclude: dropped', dropped, 'cross-rep duplicate deal(s)');
+  return dropped;
+}
+
 // Idempotent upsert into a Grow table via PostgREST merge-duplicates.
 async function growUpsert(table, rows, onConflict) {
   if (!rows.length) return 0;
@@ -588,9 +625,9 @@ export default async function handler(req, res) {
   }
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  // Accept the cron's CRON_SECRET, the browser-sync PRONTO_SYNC_KEY, or the
+  // Accept the cron's CRON_SECRET or the
   // manual-trigger SYNC_TRIGGER_KEY (CRON_SECRET is write-only in Vercel).
-  const secrets = [process.env.CRON_SECRET, process.env.PRONTO_SYNC_KEY, process.env.SYNC_TRIGGER_KEY].filter(Boolean);
+  const secrets = [process.env.CRON_SECRET, process.env.SYNC_TRIGGER_KEY].filter(Boolean);
   const auth = req.headers['authorization'] || '';
   const qkey = (req.query && req.query.key) || '';
   const ok = secrets.some((s) => auth === `Bearer ${s}` || qkey === s);
@@ -639,13 +676,20 @@ export default async function handler(req, res) {
         } catch (e) { /* no teams access; product just shows blank */ }
         // Current team per member, for reps who knock before their first sale.
         try { data.memberships = await briaPull('company_memberships', '*', creds); } catch (e) { /* optional */ }
-        // The read-only role sees every company on the new Bria. Grow is the only
-        // one today, so nothing is filtered; shout the day that changes, because a
-        // second company's reps would otherwise land in PRA and the leaderboard.
+        // The read-only role sees every company on the new Bria. Keep Grow only:
+        // sales, teams and memberships carry company_id; users don't, so a user
+        // stays when a Grow membership or a Grow sale names them.
         const cos = new Set(data.sales.map((s) => s.company_id).filter(Boolean));
-        if (cos.size > 1) {
-          await notify.notifyPush({ title: '⚠️ Bria has more than one company', body: `${cos.size} companies in Bria sales. The sync pulls all of them; it needs a company filter.`, url: '/' });
+        const isGrow = (r) => !r.company_id || String(r.company_id) === BRIA_COMPANY_ID;
+        const before = data.sales.length;
+        data.sales = data.sales.filter(isGrow);
+        if (data.teams) data.teams = data.teams.filter(isGrow);
+        if (data.memberships) data.memberships = data.memberships.filter(isGrow);
+        if (data.memberships && data.memberships.length) {
+          const keep = new Set([...data.memberships.map((m) => String(m.user_id)), ...data.sales.map((s) => String(s.user_id))]);
+          data.users = data.users.filter((u) => keep.has(String(u.id)));
         }
+        if (cos.size > 1) console.log(`Bria has ${cos.size} companies; kept Grow (${BRIA_COMPANY_ID}), dropped ${before - data.sales.length} sales from the others.`);
       }
     }
 
@@ -726,6 +770,7 @@ export default async function handler(req, res) {
     await canonicalRepNames(completionRows, salesRows, dealRows);
     const completionOut = mergeByKey(completionRows, ['rep', 'course']);
     const salesOut = mergeByKey(salesRows, ['rep', 'sale_date'], ['deals', 'installs']);
+    applyBriaExclude(dealRows, salesOut);
 
     // No training access means no training rows; replacing would blank the page.
     const wc = trainingErr ? 'skipped' : await growReplace('training_completion', completionOut, 'rep,course');

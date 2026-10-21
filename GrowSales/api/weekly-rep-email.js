@@ -60,7 +60,7 @@ const UPFRONT_OPTIN_FALLBACK = [
 // them; without this they can never receive the weekly report.
 async function loadRepFlags() {
   try {
-    const { data, error } = await sb().from('rep_flags').select('rep,is_sub,email');
+    const { data, error } = await sb().from('rep_flags').select('rep,is_sub,roster_status,email');
     if (error) throw error;
     return data || [];
   } catch (e) {
@@ -161,15 +161,19 @@ async function fetchAll(table, columns, orderCol, build) {
   return out;
 }
 
-// TDS is a division inside Grow running its own SalesRabbit Amplify account, so
-// `knocking` holds a row per (rep, date, source). Collapse to one row per rep/day.
-// Doors/contacts add (verified distinct: no lead overlap between the accounts).
-// Sold does NOT add — both syncs take sold from Bria, which tracks the person and
-// so already covers both accounts; summing would double-count. Mirrors
-// _mergeKnockingSources in index.html.
+// `knocking` holds a row per (rep, date, source, method). Collapse to one row
+// per rep/day the way index.html's _mergeKnockingSources does:
+//   grow-side rows (ezee sheet, grow crawl, sr_activity + timetrack methods,
+//   untagged legacy) describe the SAME doors measured twice, so they take the
+//   MAX per field and never add. Summing them (the old code here) inflated
+//   doors, contacts and sold for every rep with both methods.
+//   tds rows are a separate division on a separate Amplify account, verified
+//   distinct, so they add on top.
+//   sold never adds: Bria tracks the person, so each row already carries the
+//   rep's full day. Prefer the Bria-backed grow row, then ezee, then a pin.
 function mergeKnockingSources(rows) {
   const toMin = (t) => {
-    const m = String(t || '').trim().match(/^(\d{1,2}):(\d{2})\s*([AaPp])/);
+    const m = String(t || '').trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp])/);
     if (!m) return null;
     let h = +m[1] % 12; if (/[Pp]/.test(m[3])) h += 12;
     return h * 60 + (+m[2]);
@@ -183,24 +187,27 @@ function mergeKnockingSources(rows) {
   }
   return [...by.values()].map((list) => {
     const out = { ...list[0], doors: 0, unique_doors: 0, contacts: 0 };
-    // A row with no first_disp and no hours is a Time Track import counting the
-    // SAME knocking Amplify already recorded (tell: doors==unique_doors, no
-    // times). Where both exist for a rep/day, summing nearly doubles them, so
-    // prefer the timed Amplify rows and let Time Track contribute only its sold.
-    const timed = list.filter((k) => k.first_disp && (k.doors || 0) > 0);
-    for (const k of (timed.length ? timed : list)) {
-      out.doors += k.doors || 0; out.unique_doors += k.unique_doors || 0; out.contacts += k.contacts || 0;
+    const tds = list.filter((k) => k.source === 'tds');
+    const growSide = list.filter((k) => k.source !== 'tds');
+    let gd = 0, gu = 0, gc = 0;
+    for (const k of growSide) {
+      if (!((k.doors || 0) > 0) && !k.first_disp) continue;   // an empty row is not evidence of zero
+      gd = Math.max(gd, k.doors || 0); gu = Math.max(gu, k.unique_doors || 0); gc = Math.max(gc, k.contacts || 0);
     }
-    let firstM = null, lastM = null, firstS = null, lastS = null, growSold = null, altSold = 0;
+    out.doors = gd; out.unique_doors = gu; out.contacts = gc;
+    for (const k of tds) { out.doors += k.doors || 0; out.unique_doors += k.unique_doors || 0; out.contacts += k.contacts || 0; }
+    let firstM = null, lastM = null, firstS = null, lastS = null, growSold = null, ezeeSold = 0, pinSold = 0;
     for (const k of list) {
-      if (k.source === 'grow') growSold = (growSold || 0) + (k.sold || 0);
-      else altSold = Math.max(altSold, k.sold || 0);
+      if (k.source === 'grow') growSold = Math.max(growSold == null ? 0 : growSold, k.sold || 0);
+      else if (k.source === 'ezee' || !k.source) ezeeSold = Math.max(ezeeSold, k.sold || 0);
+      else pinSold = Math.max(pinSold, k.sold || 0);
       const f = toMin(k.first_disp); if (f !== null && (firstM === null || f < firstM)) { firstM = f; firstS = k.first_disp; }
       const l = toMin(k.last_disp); if (l !== null && (lastM === null || l > lastM)) { lastM = l; lastS = k.last_disp; }
     }
-    out.sold = growSold !== null ? growSold : altSold;
+    out.sold = growSold !== null ? growSold : (ezeeSold || pinSold);
     out.first_disp = firstS; out.last_disp = lastS;
     out.hours = (firstM !== null && lastM !== null && lastM > firstM) ? Math.round((lastM - firstM) / 60 * 100) / 100 : 0;
+    out.source = list.length > 1 ? 'merged' : list[0].source;
     return out;
   });
 }
@@ -218,13 +225,13 @@ async function fetchOptional(table, columns, orderCol, build) {
 }
 
 async function loadAll(knockStart, weekSat, dealsStart, briaStart) {
-  const [onboarding, attrOverrides, deals, knocking, bria, briaAll, dealsCnt, goals, reportConfig, briaDaily] = await Promise.all([
+  const [onboarding, attrOverrides, deals, knocking, bria, briaAll, dealsCnt, goals, reportConfig, briaDaily, rampRows] = await Promise.all([
     fetchAll('rep_onboarding', 'first_name,last_name,email,manager_name,manager_email,is_manager,status_id', 'sequifi_id'),
     fetchAll('rep_manager_overrides', 'rep,week,manager', 'id'),
     fetchAll('deals', 'rep,manager,status,customer,phone,sale_date,install_date,planned_install,cancel_date,week,deal_type,isp', 'id', (q) => q.gte('sale_date', dealsStart)),
     // All sources (grow + the TDS division's own Amplify account); mergeKnockingSources
     // collapses a rep's rows from both into one row per day before aggregating.
-    fetchAll('knocking', 'rep,date,doors,unique_doors,contacts,sold,first_disp,last_disp,hours,source', 'id', (q) => q.gte('date', knockStart).lte('date', weekSat)),
+    fetchAll('knocking', 'rep,date,doors,unique_doors,contacts,sold,first_disp,last_disp,hours,source,method', 'id', (q) => q.gte('date', knockStart).lte('date', weekSat)),
     // Just enough for the recap week's Bria-vs-deals gap count.
     fetchAll('bria_deals', 'rep,sale_date', 'bria_id', (q) => q.gte('sale_date', briaStart)),
     // Bria-vs-report scoreboard: full usable history, minimal columns. Kept
@@ -241,6 +248,8 @@ async function loadAll(knockStart, weekSat, dealsStart, briaStart) {
     // page uses; the deal feed undercounts. NOTE: this table has no id column,
     // so it pages on (sale_date, rep) — that pair is unique, one row per rep/day.
     fetchOptional('bria_sales_daily', 'rep,sale_date,deals', 'sale_date', (q) => q.order('rep', { ascending: true })),
+    // Ramp strip: per rep per week since their first worked day (view, no id col).
+    fetchOptional('rep_ramp_weeks', 'rep,first_day,w0,days,doors,deals,installs', 'w0', (q) => q.order('rep', { ascending: true })),
   ]);
   // The weekly roster you paste is the ONLY authority on who reports to whom.
   // deals.manager comes from Sequifi onboarding and drifts: as of Jul 2026 it
@@ -250,7 +259,7 @@ async function loadAll(knockStart, weekSat, dealsStart, briaStart) {
   // field means the texts never match the teams you set.
   const roster = await loadRoster();
   return { onboarding, attrOverrides, deals: applyRosterManagers(deals, attrOverrides, roster),
-           knocking, bria, briaAll, dealsCnt, goals, reportConfig, briaDaily, roster };
+           knocking, bria, briaAll, dealsCnt, goals, reportConfig, briaDaily, rampRows, roster };
 }
 
 // Served as static files from the public production alias. VERCEL_URL is
@@ -276,7 +285,9 @@ async function loadRoster() {
   // left alone: Master is only filled in as the week runs, so the paste is
   // fresher there. Mirrors _buildTeamAssign in index.html.
   try {
-    const thisSun = (() => { const t = new Date(); t.setDate(t.getDate() - t.getDay()); return t.toISOString().slice(0, 10); })();
+    // Local calendar Sunday. toISOString() answers in UTC, which after about
+    // 5 pm Mountain is already tomorrow and landed this on the wrong week.
+    const thisSun = (() => { const t = new Date(); t.setDate(t.getDate() - t.getDay()); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; })();
     const { data } = await sb().from('report_config').select('config').eq('manager', '__roster_weeks__').limit(1);
     const master = data && data[0] && data[0].config && data[0].config.weeks;
     for (const w of Object.keys(master || {})) {
@@ -471,6 +482,17 @@ function makeRepResolver(onboarding) {
   };
 }
 
+// Close rate = sold / contacts, only when the knocking log can support it:
+// null when no contacts are logged or sold exceeds contacts (the deals feed is
+// complete while contacts exist only on tracked days). Mirrors _closeRate in
+// index.html, so the email never shows 0% or 1500% where the app shows a dot.
+function closeRate(sold, contacts) {
+  if (!(contacts > 0)) return null;
+  if (sold > contacts) return null;
+  return sold / contacts;
+}
+const closePctTxt = (v) => (v == null ? '&#183;' : Math.round(v * 100) + '%');
+
 // ============================== per-rep aggregation ==============================
 function buildRepStats(rep, ctx) {
   const { weekSun, weekSat, windowStart } = ctx;
@@ -498,7 +520,7 @@ function buildRepStats(rep, ctx) {
   // first/last knock, and compute totals + close%.
   const gridFor = (rows) => {
     const g = sumK(rows);
-    g.close = g.contacts > 0 ? g.sold / g.contacts : 0;
+    g.close = closeRate(g.sold, g.contacts);
     const byDate = new Map();
     for (const r of rows) {
       const c = byDate.get(r.date) || { date: r.date, doors: 0, unique: 0, contacts: 0, sold: 0, first: '', last: '' };
@@ -632,6 +654,115 @@ function repFromName(name, ctx, email) {
   return { rep, stats: buildRepStats(rep, ctx) };
 }
 
+// ============================== ramp (first 4 worked weeks) ==============================
+// New-rep ramp bonus. The clock is WORKED weeks, never calendar weeks: a week
+// counts when the rep has RAMP.minDays days of more than 10 doors, and the four
+// weeks must land inside RAMP.windowWeeks calendar weeks of the first worked
+// day. Rows come from the rep_ramp_weeks view (api/ramp-schema.sql); the
+// targets are the survivor median (base) and top quartile (stretch) from
+// docs/ramp-bonus-baseline.md. Pay amounts are placeholders until set.
+const RAMP = {
+  weeks: 4, windowWeeks: 8, minDays: 4, gapClose: 3,
+  // per worked week: [base, stretch]
+  targets: {
+    1: { days: [5, 6], dpd: [85, 100] },
+    2: { days: [5, 6], dpd: [80, 100] },
+    3: { pra: [1.2, 2.2] },
+    4: { pra: [1.5, 2.0] },
+  },
+  ir: [0.70, 0.80],            // install rate on weeks 3 to 4 deals, checked at graduation
+  pay: { base: 100, stretch: 200, grad: 300 },   // PLACEHOLDER amounts
+};
+const sunOfIso = (d) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() - x.getUTCDay()); return x.toISOString().slice(0, 10); };
+
+function buildRamp(rep, ctx) {
+  const rows = (ctx.rampByRep && ctx.rampByRep.get(rep.key)) || [];
+  if (!rows.length) return null;
+  const firstDay = rows.reduce((m, r) => (m && m < r.first_day ? m : r.first_day), null);
+  const wk0 = sunOfIso(firstDay);
+  const windowEnd = addDays(wk0, RAMP.windowWeeks * 7 - 1);
+  const today = ctx.today;
+  const lastSun = ctx.weekSun;                       // last COMPLETED week
+  const byWk = new Map(rows.map((r) => [r.w0, r]));
+  const weeks = [];                                   // every calendar week from wk0 through the current one
+  for (let w = wk0; w <= today; w = addDays(w, 7)) {
+    const r = byWk.get(w) || { w0: w, days: 0, doors: 0, deals: 0, installs: 0 };
+    weeks.push({ w0: w, days: r.days || 0, doors: r.doors || 0, deals: r.deals || 0, installs: r.installs || 0, done: w <= lastSun });
+  }
+  let status = 'open', closedWhy = null, n = 0, gradWeek = null, gap = 0, earned = 0, shortWeeks = 0;
+  const marks = [];
+  for (const w of weeks) {
+    if (!w.done) break;
+    if (status !== 'open') break;
+    if (w.w0 > windowEnd) { status = 'closed'; closedWhy = 'window'; break; }
+    if (w.days === 0) { gap += 1; if (gap >= RAMP.gapClose) { status = 'closed'; closedWhy = 'gap'; break; } continue; }
+    gap = 0;
+    if (w.days < RAMP.minDays) { shortWeeks += 1; continue; }
+    n += 1;
+    const t = RAMP.targets[n];
+    const dpd = w.doors / w.days, pra = w.deals / w.days;
+    let hit = 'miss';
+    if (t.pra) hit = pra >= t.pra[1] ? 'stretch' : pra >= t.pra[0] ? 'base' : 'miss';
+    else hit = (w.days >= t.days[1] && dpd >= t.dpd[1]) ? 'stretch' : (w.days >= t.days[0] && dpd >= t.dpd[0]) ? 'base' : 'miss';
+    if (hit === 'stretch') earned += RAMP.pay.stretch; else if (hit === 'base') earned += RAMP.pay.base;
+    marks.push({ n, w0: w.w0, days: w.days, dpd: Math.round(dpd), pra: Math.round(pra * 100) / 100, deals: w.deals, installs: w.installs, hit });
+    if (n >= RAMP.weeks) { status = 'graduated'; gradWeek = w.w0; break; }
+  }
+  // Install rate on the deals from ramp weeks 3 and 4, so the graduation bonus
+  // is not paid on deals that cancel. Installs keep landing, so it is "so far".
+  const late = marks.filter((m) => m.n >= 3);
+  const lateDeals = late.reduce((a, m) => a + m.deals, 0), lateInst = late.reduce((a, m) => a + m.installs, 0);
+  const ir = lateDeals ? lateInst / lateDeals : null;
+  let gradPaid = false, gradPending = false;
+  if (status === 'graduated') { if (ir != null && ir >= RAMP.ir[0]) { earned += RAMP.pay.grad; gradPaid = true; } else gradPending = true; }
+  // Current week in progress (not a completed week yet).
+  const cur = weeks.find((w) => !w.done) || null;
+  const calLeft = status === 'open' ? Math.max(0, Math.ceil((daysBetween(today, windowEnd) + 1) / 7)) : 0;
+  // Show the strip while the window is open, and for a few weeks after it ends.
+  if (status !== 'open' && daysBetween(gradWeek || windowEnd, today) > 28) return null;
+  if (status === 'open' && today > addDays(windowEnd, 7)) return null;
+  return { firstDay, wk0, windowEnd, status, closedWhy, n, marks, earned, ir, lateDeals, gradPaid, gradPending, cur, calLeft, shortWeeks, nextN: Math.min(n + 1, RAMP.weeks) };
+}
+
+function rampHtml(r) {
+  const money = (v) => '$' + v.toLocaleString('en-US');
+  const hitCol = { stretch: C.green, base: STD_LIME, miss: C.red };
+  const hitTxt = { stretch: 'stretch', base: 'base', miss: 'missed' };
+  const pills = [];
+  for (let i = 1; i <= RAMP.weeks; i++) {
+    const m = r.marks.find((x) => x.n === i);
+    let bg = '#e5e5de', col = C.faint, big = String(i), small = 'upcoming';
+    if (m) { bg = hitCol[m.hit]; col = '#fff'; big = String(i); small = hitTxt[m.hit]; }
+    else if (i === r.nextN && r.status === 'open') { bg = '#fff'; col = C.ink; small = r.cur && r.cur.days ? `${r.cur.days} day${r.cur.days === 1 ? '' : 's'} so far` : 'this week'; }
+    pills.push(`<td style="padding:0 3px;"><div style="background:${bg};border:1px solid ${m ? bg : C.sep};border-radius:10px;padding:9px 4px;text-align:center;">
+      <div style="font-size:20px;font-weight:800;color:${col};line-height:1;">${big}</div>
+      <div style="font-size:10px;color:${m ? 'rgba(255,255,255,.9)' : C.faint};margin-top:4px;">${small}</div></div></td>`);
+  }
+  let head, sub;
+  if (r.status === 'graduated') {
+    head = 'Ramp complete';
+    sub = r.gradPaid ? `Four worked weeks done. Graduation bonus earned.` : `Four worked weeks done. Graduation bonus waits on install rate: ${r.ir == null ? 'no deals yet' : Math.round(r.ir * 100) + '% so far'} on weeks 3 to 4, needs ${Math.round(RAMP.ir[0] * 100)}%.`;
+  } else if (r.status === 'closed') {
+    head = 'Ramp closed';
+    sub = r.closedWhy === 'gap' ? `Three weeks in a row without knocking.` : `The ${RAMP.windowWeeks} week window ended with ${r.n} of ${RAMP.weeks} worked weeks.`;
+  } else {
+    const t = RAMP.targets[r.nextN];
+    const tgt = t.pra ? `PRA ${t.pra[0]} base, ${t.pra[1]} stretch` : `${t.days[0]} days at ${t.dpd[0]} doors base, ${t.days[1]} days at ${t.dpd[1]} stretch`;
+    head = `Ramp &#183; worked week ${r.nextN} of ${RAMP.weeks}`;
+    sub = `${RAMP.weeks - r.n} ramp week${RAMP.weeks - r.n === 1 ? '' : 's'} to go, ${r.calLeft} calendar week${r.calLeft === 1 ? '' : 's'} left in the window (ends ${md(r.windowEnd)}). This week: ${tgt}.`;
+  }
+  const detail = r.marks.map((m) => `wk ${m.n}: ${m.days}d, ${m.dpd} doors/day, ${m.deals} sold (PRA ${m.pra})`).join(' &#183; ');
+  return `<div style="margin-top:14px;padding:14px 16px;background:${C.card};border-left:4px solid ${r.status === 'closed' ? C.red : C.green};border-radius:10px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="font-size:15px;font-weight:800;color:${C.ink};">${head}</td>
+      <td align="right" style="font-size:15px;font-weight:800;color:${C.green};">${money(r.earned)} earned</td></tr></table>
+    <div style="font-size:12.5px;color:${C.sub};margin-top:3px;line-height:1.5;">${sub}</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;"><tr>${pills.join('')}</tr></table>
+    ${detail ? `<div style="font-size:11px;color:${C.faint};margin-top:8px;line-height:1.5;">${detail}${r.shortWeeks ? ` &#183; ${r.shortWeeks} short week${r.shortWeeks === 1 ? '' : 's'} under ${RAMP.minDays} days did not count` : ''}</div>` : ''}
+    <div style="font-size:11px;color:${C.faint};margin-top:4px;line-height:1.5;">A week counts with ${RAMP.minDays}+ days over 10 doors. Started ${md(r.firstDay)}. ${money(RAMP.pay.base)} base, ${money(RAMP.pay.stretch)} stretch per week, ${money(RAMP.pay.grad)} at graduation with ${Math.round(RAMP.ir[0] * 100)}%+ install rate on weeks 3 to 4.</div>
+  </div>`;
+}
+
 // ============================== upfront (STUB) ==============================
 // TODO(upfront): fill in once the upfront model is defined. It will receive the
 // rep's computed stats (install rate, avg days-to-install, deal counts) plus a
@@ -725,7 +856,8 @@ function markTile(label, valueTxt, value, mark, sub) {
 function standardsHtml(k, soldWk) {
   const days = k.days || 0;
   const deals = soldWk == null ? k.sold : soldWk;
-  const closePct = k.contacts > 0 ? Math.round(k.sold / k.contacts * 100) : 0;
+  const closeV = closeRate(k.sold, k.contacts);
+  const closePct = closeV == null ? 0 : Math.round(closeV * 100);
   const cpd = days ? Math.round(k.contacts / days) : 0;
   const dpd = days ? Math.round(k.doors / days) : 0;
   const hpd = days ? Math.round((k.hours / days) * 10) / 10 : 0;
@@ -734,7 +866,7 @@ function standardsHtml(k, soldWk) {
     <div style="font-size:11.5px;color:${C.faint};margin-top:3px;">The three marks under each bar are targets: minimum &#183; good &#183; great.</div>
     <div style="padding:4px 2px 2px;">
       ${stdBar('Deals &#183; week total', deals, String(deals), STD.deals, gap ? `<b style="color:${C.red};">${gap} deal${gap === 1 ? '' : 's'} short of the ${STD.deals.min} minimum.</b>` : `Everything you sold this week &#183; target ${STD.deals.min}+.`)}
-      ${stdBar('Close rate &#183; week', closePct, closePct + '%', STD.close, k.contacts > 0 ? `${k.sold} sold from ${k.contacts} contacts logged &#183; target ${STD.close.min}%+.` : 'No contacts logged.')}
+      ${stdBar('Close rate &#183; week', closePct, closePctTxt(closeV), STD.close, closeV != null ? `${k.sold} sold from ${k.contacts} contacts logged &#183; target ${STD.close.min}%+.` : (k.contacts > 0 ? 'Contacts logged do not cover the sales, so no rate.' : 'No contacts logged.'))}
       ${stdBar('Contacts &#183; daily average', cpd, String(cpd), STD.contacts, `Per day out${days ? ` &#183; ${k.contacts} total over ${days} day${days === 1 ? '' : 's'}` : ''} &#183; target ${STD.contacts.min}+ a day.`)}
     </div>
     <table role="presentation" cellpadding="0" cellspacing="6" width="100%" style="margin-top:12px;border-collapse:separate;"><tr>
@@ -818,9 +950,10 @@ function knockGridHtml(k, label, soldWk) {
     // Only rate what the knock log covers: `sold` is complete from the deals
     // feed while contacts exist only on tracked days, so a day with 3 sales and
     // 1 logged contact would otherwise read "300%".
-    const rateable = c.contacts > 0 && c.sold <= c.contacts;
-    const cr = rateable ? (c.sold / c.contacts * 100) : 0;
-    const crTxt = rateable ? Math.round(cr) + '%' : '&#8212;';
+    const crV = closeRate(c.sold, c.contacts);
+    const rateable = crV != null;
+    const cr = rateable ? crV * 100 : 0;
+    const crTxt = closePctTxt(crV);
     const fM = kToMin(c.first), lM = kToMin(c.last);
     const hrs = (fM != null && lM != null && lM > fM) ? Math.round((lM - fM) / 60 * 10) / 10 : null;
     // Same standards as the bars above, so a day reads the same way the week does.
@@ -850,14 +983,15 @@ function knockGridHtml(k, label, soldWk) {
   const avgUpct = avgD > 0 ? Math.round(avgU / avgD * 100) : 0;
   const avgC = k.days ? Math.round(k.contacts / k.days) : 0;
   const avgH = k.days ? Math.round(k.hours / k.days * 10) / 10 : 0;
-  const crAll = k.contacts > 0 ? Math.round(k.sold / k.contacts * 100) : 0;
+  const crAllV = closeRate(k.sold, k.contacts);
+  const crAll = crAllV == null ? 0 : Math.round(crAllV * 100);
   const avgRow = `<tr>
     <td style="${tdc}text-align:left;font-weight:800;color:${C.blue};${bt}">AVG</td>
     ${cell(avgD, `font-weight:800;color:${markColor(avgD, STD_DOORS)};${bt}`)}
     ${cell(`${avgU} <span style="font-size:8.5px;color:${C.sub};">(${avgUpct}%)</span>`, `font-weight:800;color:${C.ink};${bt}`)}
     ${cell(avgC, `font-weight:800;color:${stdColor(avgC, STD.contacts)};${bt}`)}
     ${cell(k.sold, `font-weight:800;color:${stdColor(k.sold, STD.deals)};${bt}`)}
-    ${cell(crAll + '%', `font-weight:800;color:${stdColor(crAll, STD.close)};${bt}`)}
+    ${cell(closePctTxt(crAllV), `font-weight:800;color:${crAllV == null ? C.faint : stdColor(crAll, STD.close)};${bt}`)}
     ${cell(avgH ? avgH + 'h' : '&#8212;', `font-weight:800;color:${avgH ? markColor(avgH, STD_HOURS) : C.faint};${bt}`)}
     ${cell(`<span style="font-size:9px;color:${C.ink};">${k.avgFirst ? _ts(k.avgFirst) : '—'}</span>`, bt)}
     ${cell(`<span style="font-size:9px;color:${C.ink};">${k.avgLast ? _ts(k.avgLast) : '—'}</span>`, bt)}
@@ -892,6 +1026,9 @@ function salesBlock(label, d) {
 // the manager is looking at on their own link, so the recap can never quote a
 // different number back at them than the app does.
 const PRA_MIN_KNOCKS = 10;
+// First week the user pasted a weekly subs list; from here only rep_flags makes
+// a sub (same constant as SUBS_LIST_START in index.html).
+const SUBS_LIST_START = '2026-09-27';
 const PRA_GOAL_METRICS = {
   pra_weekly: { label: 'Weekly PRA', dec: 1, unit: 'per rep' },
   pra_daily: { label: 'Daily PRA', dec: 2, unit: 'per rep day' },
@@ -922,33 +1059,40 @@ function buildPraGoals(data, ctx) {
     const m = rosterMgr(data.roster, rep, ctx.weekSun);
     return m ? norm(m) : null;
   };
-  const agg = new Map();   // normalised manager -> { name, sold, reps:Set, days:Set }
-  const slot = (k, display) => {
-    if (!agg.has(k)) agg.set(k, { name: display, sold: 0, reps: new Set(), days: new Set() });
+  // Ten-door rule, same as _kwBase and _mgrWeekSales in the app: a worked day
+  // is a day over PRA_MIN_KNOCKS doors, a sale alone is NOT one, and a rep
+  // with no such day all week is out of PRA on both sides (their sales are not
+  // in the numerator either, or thin knocking coverage would inflate it).
+  const agg = new Map();   // normalised manager -> { soldBy: Map rep->n, daysBy: Map rep->Set }
+  const slot = (k) => {
+    if (!agg.has(k)) agg.set(k, { soldBy: new Map(), daysBy: new Map() });
     return agg.get(k);
   };
+  const isSub = (rep) => !!(data.isSubRep && data.isSubRep(rep, ctx.weekSun));
   for (const b of (data.bria || [])) {
     if (!b || !b.rep || !b.sale_date) continue;
     if (b.sale_date < ctx.weekSun || b.sale_date > ctx.weekSat) continue;
+    if (isSub(b.rep)) continue;
     const k = mgrOf(b.rep); if (!k || !chosen.has(k)) continue;
-    const g = slot(k, b.rep);
-    g.sold += 1; g.reps.add(norm(b.rep)); g.days.add(`${norm(b.rep)}|${b.sale_date}`);
+    const g = slot(k), r = norm(b.rep);
+    g.soldBy.set(r, (g.soldBy.get(r) || 0) + 1);
   }
   for (const r of mergeKnockingSources(data.knocking || [])) {
     if (!r || !r.rep || !r.date) continue;
     if (r.date < ctx.weekSun || r.date > ctx.weekSat) continue;
     if ((r.doors || 0) <= PRA_MIN_KNOCKS) continue;
+    if (isSub(r.rep)) continue;
     const k = mgrOf(r.rep); if (!k || !chosen.has(k)) continue;
-    const g = slot(k, r.rep);
-    g.reps.add(norm(r.rep)); g.days.add(`${norm(r.rep)}|${r.date}`);
+    const g = slot(k), n = norm(r.rep);
+    if (!g.daysBy.has(n)) g.daysBy.set(n, new Set());
+    g.daysBy.get(n).add(r.date);
   }
 
   const rows = [];
   for (const [k, goal] of chosen) {
     const a = agg.get(k);
-    const reps = a ? a.reps.size : 0;
-    const repDays = a ? a.days.size : 0;
-    const sold = a ? a.sold : 0;
+    let reps = 0, repDays = 0, sold = 0;
+    if (a) for (const [r, days] of a.daysBy) { reps += 1; repDays += days.size; sold += a.soldBy.get(r) || 0; }
     const M = PRA_GOAL_METRICS[goal.metric];
     const actual = goal.metric === 'pra_daily'
       ? (repDays ? sold / repDays : 0)
@@ -1229,6 +1373,9 @@ function renderEmail(rep, s, ctx, opts) {
   const upfront = has('upfront') ? buildUpfrontSection(rep, s) : null;
   if (upfront) rows.push(upfront);
 
+  // Ramp strip for reps in their first four worked weeks.
+  if (has('ramp')) { const rr = buildRamp(rep, ctx); if (rr) rows.push(rampHtml(rr)); }
+
   // Knocking — the exact per-day grid, both weeks. Only when enabled for this rep's
   // manager (their knock data comes from a trusted source, e.g. Time Track). Managers
   // whose data is from Amplify leave it off, and the section is simply omitted.
@@ -1481,6 +1628,7 @@ export const REP_SECTIONS = [
   { k: 'note',      label: 'Your weekly note',           hint: 'the message written in the panel' },
   { k: 'checkback', label: 'Check back through the week', hint: 'the note saying numbers keep moving' },
   { k: 'upfront',   label: 'Upfront pay status',          hint: 'opted-in reps only' },
+  { k: 'ramp',      label: 'Ramp strip',                  hint: 'first four worked weeks' },
   { k: 'knocking',  label: 'Knocking grid + funnel',      hint: 'set per team' },
   { k: 'sales',     label: 'Last week sales',             hint: 'sold, installed, pending, cancelled' },
   { k: 'prior',     label: 'Two weeks ago sales',         hint: 'the comparison week' },
@@ -1571,6 +1719,7 @@ export default async function handler(req, res) {
     const knockByRep = groupByRep(mergeKnockingSources(data.knocking), (r) => resolveRep(r.rep));
     const dealsByRep = groupByRep(data.deals, (r) => resolveRep(r.rep));
     const briaByRep = groupByRep(data.bria, (r) => resolveRep(r.rep));
+    const rampByRep = groupByRep(data.rampRows || [], (r) => resolveRep(r.rep));
 
     const upfrontOptin = new Set((await loadUpfrontOptin()).map((n) => norm(n)));
 
@@ -1591,16 +1740,34 @@ export default async function handler(req, res) {
     // the same key groupByRep used for their deals.
     const flagRows = await loadRepFlags();
     const byKey = new Map(reps.map((r) => [r.key, r]));
+    // One sub rule, the app's growIsSub: an explicit roster_status wins both
+    // ways, the legacy is_sub flag still means sub, otherwise on a Bria team
+    // that week means internal, and off every team is only a sub before the
+    // weekly subs list started (SUBS_LIST_START); from then on the list is the
+    // only thing that makes a sub.
+    const flagByKey = new Map();
+    for (const f of flagRows) if (f && f.rep) flagByKey.set(resolveRep(f.rep), f);
+    const isSubRep = (rep, week) => {
+      const f = flagByKey.get(resolveRep(rep));
+      if (f) {
+        if (f.roster_status === 'sub') return true;
+        if (f.roster_status === 'internal') return false;
+        if (f.is_sub) return true;
+      }
+      if (rosterMgr(data.roster, rep, week)) return false;
+      return !!week && week < SUBS_LIST_START;
+    };
+    data.isSubRep = isSubRep;
     for (const f of flagRows) {
       if (!f || !f.rep || !f.email) continue;
       const key = resolveRep(f.rep);
-      const existing = byKey.get(key);
-      if (existing) { existing.email = f.email; existing.isSub = !!f.is_sub; continue; }
+      if (byKey.has(key)) { byKey.get(key).email = f.email; continue; }
       const parts = String(f.rep).trim().split(/\s+/);
-      const rec = { key, first: parts[0] || f.rep, last: parts.slice(1).join(' '), email: f.email, managerName: null, isSub: !!f.is_sub };
+      const rec = { key, first: parts[0] || f.rep, last: parts.slice(1).join(' '), email: f.email, managerName: null };
       reps.push(rec);
       byKey.set(key, rec);
     }
+    for (const r of reps) r.isSub = isSubRep(`${r.first} ${r.last}`.trim(), sun);
 
     // ---- Bria-vs-report scoreboard + corporate flags -----------------------
     // Same exclusion rule as the dashboard: rows with no usable customer name
@@ -1737,7 +1904,7 @@ export default async function handler(req, res) {
       if (cfg && cfg.text && (!cfg.week || cfg.week === sun)) weekNote = String(cfg.text).trim();
     } catch (e) { /* note is optional */ }
 
-    const ctx = { weekSun: sun, weekSat: sat, priorSun, priorSat, rollSun, funnelWeeks: funnelWeeks, windowStart, weekLabel, today: iso(now), knockByRep, dealsByRep, briaByRep, upfrontOptin, briaCheckByRep, reportCheckByRep, reconFlags, goalByRep, goalCurByRep, curSun, recByRep, weekNote, resolveRep };
+    const ctx = { weekSun: sun, weekSat: sat, priorSun, priorSat, rollSun, funnelWeeks: funnelWeeks, windowStart, weekLabel, today: iso(now), knockByRep, dealsByRep, briaByRep, upfrontOptin, briaCheckByRep, reportCheckByRep, reconFlags, goalByRep, goalCurByRep, curSun, recByRep, weekNote, resolveRep, rampByRep };
 
     // Compute + filter to reps with real sales, then sort by most recent sales.
     const eligible = [];

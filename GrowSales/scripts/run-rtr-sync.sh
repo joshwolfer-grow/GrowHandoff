@@ -90,6 +90,8 @@ fi
 
 worst=0
 for src in $SOURCES; do
+  # Paused from the dashboard: skip this ISP, no marker, no email.
+  bash scripts/paused.sh "rtr_$src" && { echo "$(date) [$src] paused from dashboard, skipping" >> imports/done/rtr-sync.log; continue; }
   CAD=$(cadence_of "$src")
   # A daily source runs on the first tick of the day and is skipped for the rest
   # of it. The stamp is written only on SUCCESS, so a failed morning run retries
@@ -152,7 +154,6 @@ for src in $SOURCES; do
       msg="Opendoor sync failed for $src (exit $code). See imports/done/rtr-sync.log"
       [ "$worst" != 3 ] && worst="$code"
     fi
-    /usr/bin/osascript -e "display notification \"$msg\" with title \"Grow · Opendoor Sync\" sound name \"Basso\"" || true
     # A dead session kills every ISP the same way; no point rendering the rest.
     [ "$code" = "3" ] && break
   fi

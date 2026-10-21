@@ -12,6 +12,9 @@ These are standing rules the previous owner (Josh) set while building the Grow s
 - **GrowSales is a data tool only.** No task lists, to-dos or alert pages inside the app; those live in the owner's separate tool. (Sep 16 2026.)
 - **Rep-facing surfaces stay simple.** Deep stats belong in the snapshot/email, not on rep cards. Rep contact cards are contact info only. (Aug and Sep 2026.)
 - **Visual taste:** Grow brand, not generic iOS. Black chrome `#0b0c0b`, warm paper `#f2f2ec`, brand green `#2fc352` (deep `#157a34`), Archivo Black for titles and big numbers, Garet for body (training decks). For WolfOffice/HUD: one deep blue, thin lines, 14px monospace, no ornament; the owner called glow/hex/Orbitron "super cheesy" and dense views "super confusing". Ask for a reference before any new visual. Plain-English wording ("simplify the crap out of it"): "areas" not "sectors", "Days since knocked", "Answered the door".
+- **Alerts once, then quiet.** Failure emails go out once per outage, no "recovered" mails, no reminders ("just once and that's it", Oct 19 2026); the health board is where you look for recovery.
+- **Plain, not pitchy.** Rep-facing explainers (money guide, Oct 14 to 15 2026) were called "too pitchy and cheesy" and then "needs to be way more simple overall": one paragraph plus one key box per section, no sub headers, no sales-letter openers. Quiz and verbatim items stay exactly as the owner wrote them.
+- **Lead with the number the reader will check.** A Surf import report must open with "<raw> rows = <houses> houses" (Oct 5 2026); the owner judges an import by row count against the raw file, and "in-file duplicates" sounds like loss.
 - When source data is wrong, **surface the conflict, don't paper over it**. The dashboard is how the source gets fixed (e.g. deals Pending in Sequifi but with an install date show an amber "update status" chip; status always wins).
 
 ## Spec handling
@@ -42,3 +45,8 @@ These are standing rules the previous owner (Josh) set while building the Grow s
 - After editing `index.html`, syntax-check the inline script (`node --check` on the extracted script or `new Function()`); a single missing `)` once bricked the app on "Connecting...".
 - When a number is questioned, verify against SQL rep by rep before claiming a fix.
 - Deliver per-rep totals, not deal lists, as payroll action items (Sep 11 2026).
+- After an ISP import, send only the one import csv to upload (Oct 8 2026); file the dupes report to Drive without sending it.
+- Attach files rather than linking repo paths (links into `~/Grow/GrowSales` do not open from the Desktop session).
+- Before any metric change, run `scripts/verify-metrics.mjs` on the backup and the edited file and compare; never loop a sign-in check against prod (Oct 14 2026 outage).
+- Warn before opening a browser window on the owner's screen (TDS token capture, Amplify login); he disliked pop-ups.
+- Keep all `knock_events` rows (full-year history wanted, Oct 7 2026); confirm before dropping any table, even a 55 MB one.

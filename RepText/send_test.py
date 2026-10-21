@@ -36,6 +36,8 @@ def main():
 
     with open(args.csv, newline="") as f:
         rows = list(csv.DictReader(f))
+    # Accept exports with headers like "Name" / "Phone Number" as-is.
+    rows = [{("phone" if "phone" in k.lower() else k.strip().lower()): v for k, v in r.items()} for r in rows]
 
     service = "SMS" if args.sms else "iMessage"
     plan = []

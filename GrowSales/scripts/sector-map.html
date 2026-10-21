@@ -76,6 +76,11 @@
   .pb td{text-align:right}
   .pb tr.me td{background:#fff4c2}
   .who{color:#889;font-size:11px}
+  .turf{border:1px solid #e3e5e8;border-radius:10px;padding:10px 12px}
+  .turf .th{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .turf .bk{padding:3px 9px;border-radius:6px;font-weight:800;font-size:12px;color:#111;border:1px solid rgba(0,0,0,.12)}
+  .turf table{margin-top:8px}
+  .turf td:last-child{text-align:right;font-weight:600}
   .pb pre{margin:6px 0 0;padding:8px;background:#f4f5f7;border-radius:6px;max-height:150px;overflow:auto;font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
   .small{height:30px;padding:0 10px;border:1px solid #d9dce1;border-radius:8px;background:#fff;cursor:pointer;font-weight:600;font-size:12px}
   .dl{display:flex;flex-direction:column}
@@ -107,7 +112,7 @@
   <label class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
     <input id="q" list="qlist" placeholder="Find an area, street or rep" aria-label="Find an area, street or rep" autocomplete="off"><datalist id="qlist"></datalist></label>
   <div class="seg" id="modes" role="group" aria-label="Color areas by">
-    <button data-m="rest">Rested</button><button data-m="ready">Ready</button><button data-m="wave">Last worked</button><button data-m="pen">Sold</button>
+    <button data-m="turf" hidden>Lyte status</button><button data-m="rest">Rested</button><button data-m="ready">Ready</button><button data-m="wave">Last worked</button><button data-m="pen">Sold</button>
   </div>
   <div class="wrap">
     <button class="btn" id="fbtn" aria-expanded="false"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16M7 12h10M10 19h4"/></svg>Filters<span class="badge" id="fcount" hidden></span></button>
@@ -161,9 +166,15 @@ function dayLbl(iso){ return new Date(iso + 'T12:00').toLocaleString('en-US', {m
 function ago(iso){ const d = Math.round((Date.parse(META.built + 'T12:00') - Date.parse(iso + 'T12:00')) / 864e5);
   return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d + ' days ago'; }
 
+// an ISP's own read of each area (Lyte's turf tracker), its buckets in its words
+const TURF = [['READY','#1a9850','Ready'],['WATCH','#f2d84b','Watch'],['RESTING','#d73027','Resting'],
+              ['NOT RELEASED','#9aa0a6','Not released'],['UNKNOWN','#c2a5cf','Unknown']];
+const NOTURF = '#ffffff';
+const turfColor = s => s.turf ? ((TURF.find(x => x[0] === s.turf.Bucket) || [])[1] || '#c2a5cf') : NOTURF;
 const SECTOR = ['#4e79a7','#f28e2b','#59a14f','#e15759','#b07aa1','#edc948','#76b7b2','#ff9da7','#9c755f','#bab0ac'];
 function fill(s, mode){
   if (mode === 'sector') return SECTOR[s.ci % SECTOR.length];
+  if (mode === 'turf') return turfColor(s);
   if (mode === 'ready') return ramp(s.ready / s.total);
   if (mode === 'rest') return isFresh(s) ? FRESH : restColor(s.rest);
   if (mode === 'wave') { const k = waveKey(s); return k == null ? FRESH : MONTHS[k % 12]; }
@@ -173,7 +184,7 @@ function fill(s, mode){
 }
 
 // ---------------------------------------------------------------- state
-let MODE = 'rest', FILT = '0', REP = '', DROP = -1, SEL = null;
+let MODE = META.turf ? 'turf' : 'rest', FILT = '0', REP = '', DROP = -1, SEL = null;
 const DROPS = META.drops || [];
 const inDrop = (s, i) => s.born === i ? 'new' : (s.adds && s.adds[i]) ? 'grew' : null;
 const repOf = s => s.reps.find(r => r[0] === REP);
@@ -204,7 +215,8 @@ for (const s of DATA){
   polys.push([p, s]);
   bounds = bounds ? bounds.extend(p.getBounds()) : p.getBounds();
   s._poly = p;
-  s._lbl = L.marker(s.center, {interactive: false, icon: L.divIcon({className: '', html: '<div class="lbl">' + esc(s.name) + '</div>', iconSize: [0, 0]})}).addTo(labelLayer);
+  // an area left untitled in SalesRabbit gets no label on the map, only on hover and click
+  s._lbl = L.marker(s.center, {interactive: false, icon: L.divIcon({className: '', html: / untitled( \(\d+\))?$/.test(s.name) ? '' : '<div class="lbl">' + esc(s.name) + '</div>', iconSize: [0, 0]})}).addTo(labelLayer);
 }
 map.fitBounds(bounds.pad(0.02));
 const baseW = () => { const z = map.getZoom(); return z >= 14 ? 2 : z >= 12 ? 1 : 0.5; };
@@ -228,6 +240,8 @@ function drawKey(){
   let h;
   const sw = c => '<span class="sw" style="background:' + c + '"></span>';
   if (MODE === 'sector') h = '<b>Area colors</b><br>Each area its own color';
+  else if (MODE === 'turf') h = '<b>' + esc(META.isp) + ' status</b> <span style="color:#889">their sheet, ' + esc(dayLbl(META.turf.asof)) + '</span><br>' +
+    TURF.map(x => sw(x[1]) + x[2]).join('<br>') + '<br>' + sw(NOTURF) + 'Not on their sheet';
   else if (MODE === 'ready') h = '<b>Doors ready to work</b><br>' + [[1,'Most of it'],[.5,'Half'],[0,'Hardly any']].map(([v,l]) => sw(ramp(v)) + l).join('<br>') + DASHED;
   else if (MODE === 'rest') h = '<b>Days since knocked</b><br>' + REST.map(x => sw(x[1]) + x[2]).join('<br>') + '<br>' + sw(FRESH) + 'Never knocked' + DASHED;
   else if (MODE === 'wave') { const ks = [...new Set(DATA.map(waveKey).filter(k => k != null))].sort((a,b)=>a-b);
@@ -235,7 +249,7 @@ function drawKey(){
   else { const t = {worked: 'How much is knocked', contact: 'Answered the door (60% is green)', pen: 'Sold rate (15% is green)'}[MODE];
     h = '<b>' + t + '</b><br>' + [[1,'High'],[.5,'Middle'],[0,'Low']].map(([v,l]) => sw(ramp(v)) + l).join('<br>') + '<br>' + sw('#bbb') + 'No knocks'; }
   keybox.innerHTML = h;
-  const cols = MODE === 'rest' ? [FRESH, REST[0][1], REST[2][1], REST[4][1]] : MODE === 'wave' ? MONTHS.slice(0, 4) : [ramp(1), ramp(.66), ramp(.33), ramp(0)];
+  const cols = MODE === 'turf' ? TURF.slice(0, 4).map(x => x[1]) : MODE === 'rest' ? [FRESH, REST[0][1], REST[2][1], REST[4][1]] : MODE === 'wave' ? MONTHS.slice(0, 4) : [ramp(1), ramp(.66), ramp(.33), ramp(0)];
   document.getElementById('keysw').innerHTML = cols.map(c => '<i style="background:' + c + '"></i>').join('');
 }
 let keyOpen = false;
@@ -348,6 +362,19 @@ function areaCard(s){
     if (k === 'new') tags.push('New area from the ' + dayLbl(DROPS[di].date) + ' drop');
     else if (k) tags.push('+' + s.adds[di] + ' doors from the ' + dayLbl(DROPS[di].date) + ' drop');
   }
+  const t = s.turf, tv = v => v && v !== '0' ? esc(v) : '';
+  const dayY = iso => new Date(iso + 'T12:00').toLocaleString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
+  const turf = !META.turf ? '' : !t ? '<div class="line" style="color:#889">Not on ' + esc(META.isp) + '\'s turf sheet</div>' :
+    '<div class="turf"><div class="th"><span class="bk" style="background:' + turfColor(s) + '">' + esc(t.Bucket || 'No bucket') + '</span>' +
+    '<span class="cap" style="margin:0">' + esc(META.isp) + '\'s sheet, ' + dayLbl(META.turf.asof) + '</span></div><table>' +
+    [['Serving area', t.FDH], ['Status', t.Primary_Status], ['Market', t.Market],
+     ['Homes', t.Live_HHU && t.Live_HHU !== '0' ? t.Live_HHU + ' live of ' + t.SFU : t.SFU],
+     ['Go live', t.Actual_Go_Live ? dayY(t.Actual_Go_Live) : t.Forecasted_Go_Live ? dayY(t.Forecasted_Go_Live) + ' (planned)' : ''],
+     ['Last worked', t.Last_Worked ? dayY(t.Last_Worked) + (t.Days_Since_Worked ? ', ' + t.Days_Since_Worked + ' days' : '') : 'Never'],
+     ['Pass', t.Pass_Number && t.Pass_Number !== '0' ? t.Pass_Number + (tv(t['Turf Cycle']) ? ' · ' + tv(t['Turf Cycle']) : '') : tv(t['Turf Cycle'])],
+     ['Last vendor', tv(t.Vendor_Last)], ['Notes', tv(t.Notes)]]
+      .filter(r => r[1]).map(r => '<tr><td>' + r[0] + '</td><td>' + (r[0] === 'Go live' || r[0] === 'Last worked' ? r[1] : esc(r[1])) + '</td></tr>').join('') +
+    '</table></div>';
   const last = s.wave ? 'Last worked <b>' + s.wave.from + (s.wave.from !== s.wave.to ? ' to ' + s.wave.to : '') + '</b>, ' +
     s.wave.age + ' days ago' + (s.last && s.last !== s.wave.to ? '. Latest single knock ' + s.last : '') : 'Nobody has knocked this area yet';
   const reps = s.reps.length ? '<details' + (s.reps.length <= 6 ? ' open' : '') + '><summary>Who knocked it (' + s.reps.length + ')</summary><table>' +
@@ -362,7 +389,7 @@ function areaCard(s){
     poly[0].map(p => p[0].toFixed(6) + ', ' + p[1].toFixed(6)).join('\n')).join('\n');
   const nCorner = s.poly.reduce((t, poly) => t + poly[0].length, 0);
   const draw = '<details><summary>Corner points (' + nCorner + ')</summary><button class="small copy" data-c="' + encodeURIComponent(corners) + '" style="margin-top:6px">Copy all</button><pre>' + corners + '</pre></details>';
-  return tags.map(t => '<div class="tag">' + t + '</div>').join('') +
+  return tags.map(t => '<div class="tag">' + t + '</div>').join('') + turf +
     '<div class="stats">' + stat(s.ready, 'Ready to work (' + pct(s.ready, s.total) + ')') + stat(rough(isFresh(s) ? null : s.rest), 'Rested, middle door') +
     stat(s.never, 'Never knocked of ' + s.total) + stat(s.sold + ' <small style="font-size:12px;color:#6b7178">' + pct(s.sold, s.total) + '</small>', 'Sold') + '</div>' +
     '<div class="line">' + last + '</div>' +
@@ -381,7 +408,7 @@ function dropList(){
 function paintPanel(){
   if (SEL){
     document.getElementById('ptitle').textContent = SEL.name;
-    document.getElementById('psub').textContent = [SEL.cities, (SEL.streets || []).join(', ')].filter(Boolean).join(' · ');
+    document.getElementById('psub').textContent = [SEL.turf && SEL.turf.FDH, SEL.cities, (SEL.streets || []).join(', ')].filter(Boolean).join(' · ');
     pbody.innerHTML = areaCard(SEL);
     panel.hidden = false;
   } else if (DROP >= 0){
@@ -436,6 +463,7 @@ document.addEventListener('keydown', e => {
 });
 
 // ---------------------------------------------------------------- controls
+if (META.turf){ const b = document.querySelector('#modes [data-m="turf"]'); b.hidden = false; b.textContent = META.isp + ' status'; }
 document.querySelectorAll('#modes button').forEach(b => b.onclick = () => { MODE = b.dataset.m; render(); });
 document.getElementById('more').onchange = e => { if (e.target.value){ MODE = e.target.value; render(); } };
 document.querySelectorAll('#filts button').forEach(b => b.onclick = () => {
@@ -483,6 +511,7 @@ document.getElementById('pts').onchange = e => {
 const qlist = document.getElementById('qlist'), q = document.getElementById('q');
 const opts = [], seen = new Set();
 DATA.slice().sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true})).forEach(s => opts.push(s.name));
+DATA.forEach(s => { if (s.turf && s.turf.FDH) opts.push(s.turf.FDH + ' · ' + s.name); });
 DATA.forEach(s => (s.streets || []).forEach(st => { const k = st + ' · ' + s.name; if (!seen.has(k)){ seen.add(k); opts.push(k); } }));
 Object.keys(repDoors).sort().forEach(r => opts.push('Rep: ' + r));
 qlist.innerHTML = opts.map(o => '<option value="' + esc(o) + '"></option>').join('');

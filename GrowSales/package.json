@@ -1,12 +1,9 @@
 {
   "private": true,
-  "scripts": {
-    "import-timetrack": "node scripts/import-timetrack.mjs --scan"
-  },
+  "scripts": {},
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0",
     "nodemailer": "^9.0.3",
-    "playwright": "^1.61.1",
-    "web-push": "^3.6.7"
+    "playwright": "^1.61.1"
   }
 }

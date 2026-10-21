@@ -1,6 +1,6 @@
 # Data sources
 
-Who is the source of truth for what (current as of Oct 1 2026):
+Who is the source of truth for what (current as of Oct 21 2026):
 
 | Question | Source |
 |---|---|
@@ -25,6 +25,11 @@ Who is the source of truth for what (current as of Oct 1 2026):
 - Bria tables in Grow DB: `bria_deals` (incl. `team_id`, `isp`, `product`, `customer`, `phone`), `bria_sales_daily`, `bria_reps` (rep, bria_id, photo_url; upsert never replace so a failed pull can't blank photos), `bria_teams`, `bria_memberships`, `training_completion`. Rep photos: Bria `users.photo_url`, fetched in a separate guarded call; dashboard `_avatarHtml` overlays it on the initials with `onerror="this.remove()"`; name match via `_repPhotoNorm`.
 - ISP lives on the Bria deal: `client_company_name` is ~100% populated; `product_label` is always "Fiber Internet" (moved to `teams` in new Bria). Spellings differ from the install report ("i3 Fiber" vs "i3 Broadband", "SLIC Fiber" vs "SLIC", "TDS Fiber" vs "TDS", "GFiber"/"Google Fiber"); always compare via `_ispKey()` / `_ufIspKey()` (strip fiber/broadband/internet/llc/inc, map g→google). BUT Bria's isp label is unreliable for team assignment (Hogue crew showed Glo Fiber while selling Omni MI); never assign teams by Bria isp.
 - Bria has no deal-type column and no planned_install for presale. ~1,223 old rows had a raw UUID as rep (4 nameless users); `_isUuidRep()` drops them everywhere.
+- **Demo company (Oct 14 to 16 2026):** Bria added a second company `b71a0000-de00-4000-8000-000000000001` (teams Demo Falcons / Harbor / Summit, ISPs "Demo Fiber", "Summit Net (Demo)", "Harbor Broadband (Demo)", reps like Umber Fernwhistle, Finley Thistlecrown, John Doe: 31 users, 3,105 "installed" sales back-dated to May 1). The read-only role sees every company, so the Oct 16 09:22 sync pulled it into `bria_sales_daily`, `bria_deals`, `bria_memberships`, `bria_teams` and `__bria_teams__` (PRA and leaderboards showed fake reps). Grow's company id is `aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1` (`BRIA_COMPANY_ID` const in `bria-sync.js`, env override). Fix deployed Oct 16 18:40: sales/teams/memberships filtered by company, users by Grow membership or sale; run with `?force=1`; demo rows in the upsert-only tables deleted by hand. The earlier "alerts if more than one company_id" note no longer applies; the filter is the guard.
+- **Cross-rep duplicates (Oct 2026):** the same customer entered under two reps on the same day inflates Bria counts (Will Gabor 30 vs real 25 on Oct 3: five Surf customers also under "Kanyon", Sequifi credits Reuben Dodson; also Conner Gardner/Ryan Ewell, Isaiah Wiggins/Kaden Neff, Trenton Dennis, Jacob/Jacob Stenberg). Tell: Leaderboard Club count (bria_sales_daily) vs its click-in list (Sequifi deals). The owner wants Bria cleaned, with a stopgap `BRIA_EXCLUDE` list + `applyBriaExclude()` in `api/bria-sync.js` (named rep+date+customer entries dropped at sync, subtracting only what is found; no-op once Bria is fixed; needs a sync run). No general dedupe unless asked. When a count looks high, check `bria_deals` for the same customer + sale_date under several reps and report it for Bria cleanup.
+- **First-name-only Bria logins** (Oct 2026): "Jacob" (created Sep 30) is Jacob Stenberg (10 customers under both names), "Kanyon" (36 deals, Chicago/Illinois/Indiana) matches Reuben Dodson's Sequifi deals, "mana" = mana boyde. These are Bria account fixes, not aliases. Bria rows carry NO email column (`bria_sales_daily` is rep/sale_date/deals/installs); Bria joins to a person only by name alias in the browser.
+- Bria's isp tags are wrong often enough to ignore for teams (Oct 20: Hinshaw/Stenberg/Finny tagged i3, the Michigan crew tagged Omni; Surf reps tagged i3/Ezee).
+- Some reps stopped entering deals in Bria after Sep 24 2026 (Isaiah Wiggins, Quay Manuel, Slone Potts, the Hogues) while install reports kept showing their sales, so Bria-sourced weeks read low for Ezee Michigan and Houston; the Oct 2026 decks used the install report where it covered the week.
 - Bria's own devs (they use Grok) read our `knock_board_company` view to show the Knocking board inside Bria (see knocking.md).
 - Bria sold runs above the install report (e.g. week of Jul 19: 821 vs 527). Old view: "higher is better" for leaderboards.
 
@@ -50,6 +55,7 @@ Who is the source of truth for what (current as of Oct 1 2026):
 - Vercel `SEQUIFI_TOKEN` is Sensitive and went stale Sep 8 2026 while the human's copy worked; when the sync 401s, re-set the var. The same token is duplicated in the onboarding Apps Script; update both.
 - Sequifi does not model a manager hierarchy beyond the per-user `manager` field and offices ("X Region", "Blitz #n").
 - `/v1/users` (~515) is every user ever, not the active roster.
+- **Local token (Oct 21 2026): `data/.sequifi-token` does not exist on disk**, so local Sequifi scripts cannot call the API; the Vercel cron (`sequifi-sync`) writes `rep_onboarding` (employee_id + email) and that mirror is the practical source for identity work. `sequifi-sync` does NOT write deals; deals come from the Rep Sales sheet.
 
 ### Onboarding automation (Apps Script, outside this repo)
 
@@ -84,7 +90,7 @@ Who is the source of truth for what (current as of Oct 1 2026):
 ## Opendoor RTR portal (Realtime Results SSRS reports)
 
 One report host and Chrome profile (`.rtr-profile`) covers three ISPs, pulled by `scripts/rtr-sync.mjs` with config in `data/rtr-sources.json`:
-- **Ezee** `/Ezee Fiber/Time_Track` (+ Highlight report for start/end). Grow = Houston Contractor Team 5, Chicago Contractor Team 4, Detroit Contractor Team 1 (Ezee teams are "<Market> Internal/Contractor Team N", no company names). Also `/Ezee Fiber/Activity_Detail` (one row per knock for ALL of Ezee: BU_Level_2/3, Agent, Sales_ID, Disposition, Date_Submitted, House, Street, CalcCity/State/Zip, cust_misc1, Segment, Knock/Contact/Sale; params Start/End ctl03/ctl05, Division ctl07, Team ctl09, Agent ctl11, Disposition ctl13) and `/Ezee Fiber/Address_Snapshot` (last disposition per address). Paths only reachable by pasting `?Path=`.
+- **Ezee** `/Ezee Fiber/Time_Track` (+ Highlight report for start/end; the plain Time_Track supplies the market tag from `BU_Level_3`, 2 renders per tick since Oct 1 2026). `Activity_Detail` has a hard floor of Aug 17 2026 (earlier dates return "no report loaded"); `Distance` there is FEET from the rep's phone to the address, `DistanceKnock`=1 past 500 ft (see knocking.md). Grow = Houston Contractor Team 5, Chicago Contractor Team 4, Detroit Contractor Team 1 (Ezee teams are "<Market> Internal/Contractor Team N", no company names). Also `/Ezee Fiber/Activity_Detail` (one row per knock for ALL of Ezee: BU_Level_2/3, Agent, Sales_ID, Disposition, Date_Submitted, House, Street, CalcCity/State/Zip, cust_misc1, Segment, Knock/Contact/Sale; params Start/End ctl03/ctl05, Division ctl07, Team ctl09, Agent ctl11, Disposition ctl13) and `/Ezee Fiber/Address_Snapshot` (last disposition per address). Paths only reachable by pasting `?Path=`.
 - **Bluepeak** folder `/VastBroadband/Time_Track` (pre-rebrand). Live since 2026-08-18, backfilled 3/9 to 8/15/2026.
 - **Omni Fiber** folder `/Omni Fiber/Time_Track` (with the space). Live since 2026-08-21, data floor 5/11/2026. Grow's Omni activity stopped 2026-08-07.
 - `hub.realtimeresults.com` (Record Lookup) uses an expiring login; the report host stays signed in. SSO expiry = rtr-sync exit 3; only a human can renew.
@@ -93,9 +99,17 @@ One report host and Chrome profile (`.rtr-profile`) covers three ISPs, pulled by
 
 TDS has its own Amplify login and its own SalesRabbit tenant on the OLD platform (`web.salesrabbit.com`, `capi.salesrabbit.com/v1`, account 301657 "TDS Telecommunications LLC", our login profile 886 "Grow Marketing Main User 2"). See knocking.md and isp-pipeline.md.
 
+## MBS (Surf's CDG billing portal)
+
+MBS = CDG Portal behind Surf (`surfinternet.cdgportal.com`, company 0160), Okta SSO; opens as a popup but any Chrome tab in the same profile shares the session, so Claude in Chrome can drive it. Customer Care > Subscribers search takes a street address ("406 KOERNER") or last name; Match Type "Service Address" / "Subscriber Address" are the real hits, "Service ID / Account ID / Guarantor ID" rows are fuzzy junk. A row's `onmouseup` loads the Services grid; Status "Active" + Date = installed, inactive subscriber with 0 services = cancelled order. Gotchas: Match Type text uses a non-breaking space (regex `\s+`); address search catches neighbours (236 vs 234, 155 N vs 155 S), so confirm house number + street + name or a date after the sale; Enter in the search box does nothing (click the form's submit button); a `beforeunload` guard must be nulled before reload. On-command only, no cron (~2s per lookup via `javascript_tool`); port to a Playwright script with a persistent profile like `tds-sr-sync` if it becomes recurring. Oct 16 2026 audit of 128 cancelled Surf deals (Braidwood/Wilmington/Rock Falls/Sterling, Sep 21 onward): only Codi Rawls (10-06) and Nick Gornik (10-12) installed, both had already replied "installed"; 37 addresses had an older Surf customer already active.
+
+## TDS cancel report
+
+"Grow Cancel Report.xlsx" emailed by TDS: the only source of TDS phone, email, order number and cancel reason. Import via `callback-import.mjs --isp TDS`; see isp-pipeline.md.
+
 ## Other vendors
 
 - **Terros** (door CRM used for some leads): API key in `~/.terros.env` on the old Mac, header `Authorization: ApiKey <key>`, all endpoints POST. `scripts/geocode-file.mjs --terros --rep "Name"` then `scripts/push-to-terros.mjs`: `/import/add` (entity=Account, disableGeocoding=true, addMissingUsers=false, createCustomLocations=true) → PUT CSV to S3 URL → poll `/import/get` → `/import/errors`; undo with `/import/cleanup`. Rep name→userId via `/user/list` cached in `data/terros-reps.json` (companyId `C.DAOJaKdk`); assignment goes in `owner`; good field set street, city, state, zip, latitude, longitude, owner, stage=Lead. Manual by design (terros-import skill).
 - **Geocodio** ($1/1k, 2,500/day free) key in `~/.geocodio.env`. Beat Smarty (88.9% vs 76% rooftop). Bad pins come from bad source addresses; judge by `accuracy_type`, not suffix rewrites. `~/Downloads` was TCC-blocked; copy files into `data/` first.
-- **Gmail SMTP** (`GMAIL_USER`, `GMAIL_APP_PASSWORD`) sends the weekly emails and email-login codes.
+- **Gmail SMTP** (`GMAIL_USER`, `GMAIL_APP_PASSWORD`) sends the weekly emails and email-login codes, the local crawler failure emails (`alert-email.py`, creds in `.env.prod`), and the same mailbox is read (IMAP) by `mail-leads-pull.py`. All tied to the owner's Workspace account.
 - **Google Drive** for ISP workbooks, raw lead archives, audit sheets.

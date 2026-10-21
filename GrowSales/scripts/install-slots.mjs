@@ -44,6 +44,21 @@ const SECRETS = (() => {
 })();
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const daysBetween = (a, b) => Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 864e5);
+// A short label for one install window, whatever shape the portal gives it
+// ("8am-12pm", {start,end}, {label}). Kept on each grid day as `times` so the
+// Install Slots calendar can show the real windows, not just a count.
+const hm = (t) => { t = String(t); if (/^\d{4}-\d{2}-\d{2}T/.test(t)) t = t.slice(11, 16); const m = t.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)?/i); if (!m) return String(t); let h = +m[1]; const ap = m[3] ? m[3].toLowerCase() : (h >= 12 ? 'pm' : 'am'); if (m[3] && ap === 'pm' && h < 12) h += 12; if (m[3] && ap === 'am' && h === 12) h = 0; return `${h % 12 || 12}${m[2] && m[2] !== '00' ? ':' + m[2] : ''}${h >= 12 ? 'p' : 'a'}`; };
+function label(w) {
+  if (w == null) return '';
+  if (typeof w === 'string') { const m = w.match(/^\s*([\d:apm ]+?)\s*(?:-|to|–)\s*([\d:apm ]+?)\s*$/i); return m ? `${hm(m[1])}-${hm(m[2])}` : w.trim(); }
+  if (typeof w !== 'object') return String(w);
+  const s = w.start ?? w.startTime ?? w.start_time ?? w.from ?? w.begin;
+  const e = w.end_display ?? w.end ?? w.endTime ?? w.end_time ?? w.to ?? w.finish;
+  if (s != null && e != null) return `${hm(s)}-${hm(e)}`;
+  const l = w.label ?? w.name ?? w.time ?? w.timeSlot ?? w.slot ?? w.window ?? w.text ?? w.display;
+  if (l != null) return label(l);
+  return JSON.stringify(w).slice(0, 40);
+}
 
 // ---------------------------------------------------------------------------
 // TDS: public D2D offer portal, no login. The checkout page fetches the earliest
@@ -102,7 +117,7 @@ async function tds(page, { address }) {
   const byDate = sched.scheduleByDate || {};
   // A window with score 0 is shown but greyed out; count only bookable ones.
   const days = Object.entries(byDate)
-    .map(([date, v]) => ({ date, windows: (v.windows || []).filter((w) => w.score > 0).length }))
+    .map(([date, v]) => { const ws = (v.windows || []).filter((w) => w.score > 0); return { date, windows: ws.length, times: ws.map(label) }; })
     .filter((d) => d.windows > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
   return { earliest_offered: earliest.date ? earliest.date.slice(0, 10) : null, days };
@@ -145,7 +160,7 @@ async function surf(page, { address }) {
   const data = body.dates ? body : (body.data || body);
   if (!Array.isArray(data.dates)) throw new Error(`no calendar for this address: ${JSON.stringify(body).slice(0, 200)}`);
   const days = data.dates
-    .map((d) => ({ date: d.date, windows: (d.times || []).length }))
+    .map((d) => ({ date: d.date, windows: (d.times || []).length, times: (d.times || []).map(label) }))
     .filter((d) => d.windows > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
   return { earliest_offered: days[0]?.date || null, days };
@@ -221,13 +236,19 @@ for (const isp of isps) {
         grid: res.days, ok: true, error: null,
       };
       rows.push(row);
+      if (DRY && first) console.log(`         ${first.date}: ${(first.times || []).join(', ') || '(no times)'}`);
       console.log(`${isp.padEnd(8)} ${probe.market.padEnd(16)} earliest ${row.earliest_date} (${row.days_out}d out)  ${row.windows_first_day} windows that day, ${row.windows_next_7d} in 7 days  [${((Date.now() - t0) / 1000).toFixed(0)}s]`);
     } catch (e) {
       failures++;
       if (e instanceof LoginNeeded) loginFailure = true;
       const shot = join(ROOT, `imports/done/install-slots-${isp}-${probe.market.replace(/\W+/g, '_')}.png`);
       await page.screenshot({ path: shot, fullPage: true }).catch(() => {});
-      rows.push({ isp, market: probe.market, address: probe.address, checked_at: new Date().toISOString(), ok: false, error: String(e.message || e).slice(0, 300) });
+      // Same keys as a success row: PostgREST rejects a bulk insert whose objects
+      // differ in shape (PGRST102), which was dropping the WHOLE run when any
+      // one market failed.
+      rows.push({ isp, market: probe.market, address: probe.address, checked_at: new Date().toISOString(),
+        earliest_date: null, days_out: null, windows_first_day: 0, windows_next_7d: 0, grid: [],
+        ok: false, error: String(e.message || e).slice(0, 300) });
       console.error(`${isp.padEnd(8)} ${probe.market.padEnd(16)} FAILED: ${String(e.message || e).split('\n')[0]}  (screenshot ${shot})`);
     } finally {
       if (shared) await page.close().catch(() => {}); else await ctx.close().catch(() => {});

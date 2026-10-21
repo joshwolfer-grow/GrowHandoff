@@ -19,6 +19,9 @@
 #
 # Never fails the caller: the marker is cosmetic, the sync result is what counts.
 cd "$(dirname "$0")/.." || exit 0
+# Email on failure / recovery (state changes only). Backgrounded so SMTP can
+# never slow or fail the sync. Replaces the old per-runner Mac banners.
+/usr/bin/python3 scripts/alert-email.py "$1" "$2" "${3:-}" "${4:-}" "${5:-}" >/dev/null 2>&1 &
 KEY=$(grep -oE 'eyJ[A-Za-z0-9_.-]{50,}' index.html 2>/dev/null | head -1)
 [ -z "$KEY" ] && exit 0
 NAME="__${1}__"

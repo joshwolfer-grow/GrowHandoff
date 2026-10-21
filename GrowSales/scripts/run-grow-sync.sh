@@ -15,6 +15,9 @@
 
 cd "$(dirname "$0")/.." || exit 1
 
+# Paused from the dashboard (Live badge > Pause). Skip without a marker, so no red and no email.
+bash scripts/paused.sh sr && { echo "$(date) paused from dashboard, skipping" >> imports/done/sr-sync.log; exit 0; }
+
 NODE=$(ls -d "$HOME"/.nvm/versions/node/*/bin/node 2>/dev/null | sort -V | tail -1)
 [ -z "$NODE" ] && NODE=$(command -v node)
 [ -z "$NODE" ] && { echo "$(date) node not found" >> imports/done/sr-sync.log; exit 1; }
@@ -57,6 +60,15 @@ code=$?
 # Reap the watchdog inside the redirect, or bash prints a scary
 # "Terminated: 15" job notice for it on every healthy run.
 { kill $wd && wait $wd; } 2>/dev/null
+# Rep GPS trail (Ops > Rep Map). Same token, under a second, and its own cap so a
+# hang here can never hold the pid lock. Never fails the tick: a missed run just
+# re-reads the overlap next time.
+"$NODE" scripts/rep-locations-sync.mjs >> imports/done/sr-sync.log 2>&1 &
+lp=$!
+( sleep 60; kill -9 $lp 2>/dev/null ) &
+lw=$!
+wait $lp
+{ kill $lw && wait $lw; } 2>/dev/null
 if [ "$code" = "137" ]; then
   echo "$(date) run exceeded 4 min and was killed" >> imports/done/sr-sync.log
 fi
@@ -72,6 +84,12 @@ if [ "$code" != 0 ]; then
   # behind; by 2026-08-18 they were 68% dead lines and the compile read 1.3 GB to
   # use half of it, which took a tick from 11s to over the cap. Compacting took it
   # straight back to 11s. So name THAT command, not the retry.
+  # A big BACKLOG used to be the other cause (2026-10-16: a token expired overnight,
+  # ~15,000 changed leads, every tick killed at the cap, seven hours of 137). It is
+  # not anymore: under --scheduled the crawl stops after 30 es_search pages, saves
+  # how far it got in data/sr-sync-state.json ("partial") and the next tick resumes
+  # there, so a backlog drains over a few ticks on its own. A 137 that persists
+  # across ticks is therefore the store, not the backlog.
   [ "$code" = "137" ] && msg="sync ran past its 4 minute cap and was killed. Usually the crawl store has filled with superseded lines. Compacting it is safe and keeps a backup" && fix="node scripts/compact-store.mjs"
   echo "$(date) FAILED exit $code" >> imports/done/sr-sync.log
   # Tell the dashboard, not just this Mac. The osascript notification below is
@@ -80,10 +98,9 @@ if [ "$code" != 0 ]; then
   # the app could see, and the start-of-day card kept reporting the last good
   # crawl as if nothing were wrong. That is how the token sat expired for eight
   # hours on 2026-08-07 with the card showing "catching up after sleep".
-  bash scripts/sync-marker.sh sr_health fail "$msg" "$fix"
-  /usr/bin/osascript -e "display notification \"$msg\" with title \"Grow · SalesRabbit Sync\" sound name \"Basso\"" || true
+  bash scripts/sync-marker.sh sr_health fail "$msg" "$fix" "knock schedule"
   exit "$code"
 fi
 
 # Clear the failure. Without this the card would stay red after a good run.
-bash scripts/sync-marker.sh sr_health ok "crawl ok"
+bash scripts/sync-marker.sh sr_health ok "crawl ok" "" "knock schedule"

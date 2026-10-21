@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Ezee addresses -> Supabase (and from there the Ezee Addresses Sheet). Once a day, first tick after 7am.
+
+  Hourly StartInterval with the once-a-day gate inside run-ezee-addresses.sh, for the
+  same reason as the other agents: a laptop drops calendar firings it sleeps
+  through, but catches up a missed StartInterval on wake.
+
+  Install:
+    cp scripts/launchd/com.grow.ezee-addresses.plist ~/Library/LaunchAgents/
+    launchctl unload ~/Library/LaunchAgents/com.grow.ezee-addresses.plist 2>/dev/null
+    launchctl load ~/Library/LaunchAgents/com.grow.ezee-addresses.plist
+  Check:   launchctl list | grep isp-export
+  Run now: EZEE_FORCE=1 bash scripts/run-ezee-addresses.sh
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.grow.ezee-addresses</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/joshuawolfer/Grow/GrowSales/scripts/run-ezee-addresses.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>/Library/Frameworks/Python.framework/Versions/3.10/bin:/Users/joshuawolfer/.nvm/versions/node/v20.20.2/bin:/usr/bin:/bin:/usr/local/bin</string></dict>
+  <key>StartInterval</key>
+  <integer>3600</integer>
+  <key>StandardErrorPath</key>
+  <string>/Users/joshuawolfer/Grow/GrowSales/imports/done/ezee-addresses-agent.err</string>
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

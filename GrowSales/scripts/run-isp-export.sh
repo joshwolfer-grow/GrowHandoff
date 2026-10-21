@@ -37,6 +37,8 @@ _today=$(date +%Y-%m-%d)
 if [ -z "$ISP_FORCE" ]; then
   [ "$_hour" -lt "$ISP_START_HOUR" ] && exit 0
   [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$_today" ] && exit 0
+  # Paused from the dashboard. A manual ISP_FORCE run still goes.
+  bash scripts/paused.sh isp && exit 0
 fi
 
 NODE=$(ls -d "$HOME"/.nvm/versions/node/*/bin/node 2>/dev/null | sort -V | tail -1)
@@ -108,7 +110,6 @@ fi
 if [ -n "$msg" ]; then
   echo "$(date) FAILED: $msg" >> "$LOG"
   bash scripts/sync-marker.sh isp_export fail "$msg" "ISP_FORCE=1 bash scripts/run-isp-export.sh" daily
-  /usr/bin/osascript -e "display notification \"$msg\" with title \"Grow · ISP workbooks\" sound name \"Basso\"" || true
   exit 1
 fi
 
@@ -123,11 +124,12 @@ if [ -f data/sr-auth-tds.json ]; then
   ( "$NODE" scripts/tds-sr-sync.mjs && "$PY" scripts/sector-build.py TDS --extract ) >> "$LOG" 2>&1 &
   tp=$!; ( sleep 900; kill -9 $tp 2>/dev/null ) & tw=$!; wait $tp || echo "tds crawl failed ($?)" >> "$LOG"; kill $tw 2>/dev/null
 fi
-if "$PY" scripts/sector-maps.py --all >> "$LOG" 2>&1; then
+# Reported under its own Wolf Office card (Mapper), which also has a Run now.
+if "$HOME/bin/office-wrap" mapper --status-from-last-line -- "$PY" scripts/sector-maps.py --all >> imports/done/sector-maps.log 2>&1; then
   bash scripts/sync-marker.sh sector_maps ok "ISP maps refreshed" "" daily
 else
-  echo "$(date) sector maps failed, workbooks were fine" >> "$LOG"
-  bash scripts/sync-marker.sh sector_maps fail "ISP maps on the site are stale. See $LOG" \
+  echo "$(date) sector maps failed, workbooks were fine (imports/done/sector-maps.log)" >> "$LOG"
+  bash scripts/sync-marker.sh sector_maps fail "ISP maps on the site are stale. See imports/done/sector-maps.log" \
     "python3 scripts/sector-maps.py --all" daily
 fi
 

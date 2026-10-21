@@ -10,6 +10,15 @@
 //   node scripts/grow-sync.mjs --scheduled --push-days 7   # what the agent runs
 //   node scripts/grow-sync.mjs --lean         # skip the big CSVs (knock rows only)
 //   node scripts/grow-sync.mjs --scheduled --full-csv   # scheduled, CSVs anyway
+//   node scripts/grow-sync.mjs --max-pages 30 # stop the scan after 30 pages, resume next run
+//
+// BACKLOG: --scheduled caps the scan at 30 es_search pages (MAX_PAGES). A run
+// that hits the cap re-pulls the leads it has, records how far it got in
+// sr-sync-state.json ("partial"), and the next tick resumes from there; the
+// real watermark moves only once the whole window is covered. That is what
+// lets a 15,000-lead backlog drain inside run-grow-sync.sh's 240s watchdog
+// instead of every tick dying at the cap (2026-10-16). Dry test, no network:
+// node scripts/test-grow-sync-resume.mjs
 //
 // INTRADAY: the crawl is watermark-driven, so running it every 10 minutes costs
 // 10 minutes of leads, not a day's. scripts/run-grow-sync.sh + the launchd agent
@@ -51,7 +60,7 @@
 // run never corrupts anything and a re-run just continues:
 //   data/sr-store.jsonl       {"id","a":[{t,ev,rep,em,st,na,no,di}]} per lead
 //   data/sr-leads.jsonl       lead meta (address, stage, assignee), same rule
-//   data/sr-sync-state.json   the watermark
+//   data/sr-sync-state.json   the watermark, plus "partial" while a capped scan is mid-window
 //
 // First run bootstraps sr-store.jsonl from sr-activity.csv (the full crawl's
 // output), so the 40-minute pull never has to happen again. A full re-crawl is
@@ -93,10 +102,28 @@ const PUSH_DAYS = arg('--push-days') ? Math.max(1, Number(arg('--push-days'))) :
 // rebuilds every CSV, which is when the reporting scripts want them fresh.
 // --lean / --full-csv force it either way.
 const LEAN = flag('--lean') || (SCHEDULED && !flag('--full-csv'));
+// How many es_search pages one run may walk before it stops, re-pulls what it
+// has, and saves where it got to. run-grow-sync.sh kills a tick at 240s, and a
+// backlog that does not fit in 240s used to be fatal: every tick restarted the
+// scan from page 1, died at the cap before the watermark could move, and the
+// schedule looped like that until someone ran the sync by hand with no cap
+// (2026-10-16: a token expired overnight, ~15,000 changed leads, seven hours of
+// exit 137). Now a scheduled run gives up on the scan after this many pages and
+// the NEXT tick resumes from there (see `partial` in crawl()), so a backlog of
+// any size drains in a few ticks instead of never. 30 pages is 3,000 leads, about
+// 45s of activity pulls at the default concurrency, well inside the cap with the
+// compile and push behind it. Manual runs stay uncapped unless --max-pages says.
+const MAX_PAGES = arg('--max-pages') ? Math.max(1, Number(arg('--max-pages'))) : (SCHEDULED ? 30 : 0);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const D = (f) => join(ROOT, 'data', f);
+// --data-dir and --api exist for dry tests of the crawl against a mock server
+// (see scripts/test-grow-sync-resume.mjs): every file the run reads or writes
+// lands in that directory, and nothing is written to Supabase. Never set on a
+// real run.
+const DATA_DIR = arg('--data-dir') || join(ROOT, 'data');
+const DRY = !!arg('--data-dir');
+const D = (f) => join(DATA_DIR, f);
 // --tenant tds crawls a SECOND SalesRabbit company (TDS has its own tenant, own
 // login, own leads). Everything it touches is kept apart: its own Chrome profile
 // and token, and data files prefixed with the tenant slug instead of "sr-". It
@@ -109,7 +136,7 @@ const STORE = D(`${PFX}store.jsonl`), LEADS = D(`${PFX}leads.jsonl`), STATE = D(
 const ACT_CSV = D(`${PFX}activity.csv`), HIST_CSV = D(`${PFX}lead-history.csv`);
 const DOORS_CSV = D(`${PFX}doors-by-area.csv`), KNOCK_CSV = D(`${PFX}knocking.csv`);
 const LOOKUPS = D(`${PFX}lookups.json`), EMAILS = D(TENANT ? `rep-emails-${TENANT}.json` : 'rep-emails.json');
-const APP = 'https://app.salesrabbit.com', API = 'https://apis.salesrabbit.com';
+const APP = 'https://app.salesrabbit.com', API = arg('--api') || 'https://apis.salesrabbit.com';
 const PROFILE = join(ROOT, TENANT ? `.sr-profile-${TENANT}` : '.sr-profile');
 const SB = 'https://cmkfohwbejcztctrpdnt.supabase.co';
 
@@ -436,7 +463,15 @@ async function crawl() {
   }
   // Overlap so nothing near the boundary is missed; latest-wins absorbs repeats.
   const cutoff = new Date(Date.parse(watermark || '2020-01-01') - 30 * 60000).toISOString();
-  console.log(`Crawl: everything active since ${cutoff.slice(0, 16)} ...`);
+  // A scan the last run could not finish. `newest` is the top of the window as
+  // it stood when that scan started (what the watermark becomes once the whole
+  // window is covered); `reached` is the oldest latest_activity_at it got to,
+  // every lead at or above it already re-pulled; `pages` is where it stopped.
+  // The window itself (cutoff) is unchanged until then, so the marker is only
+  // meaningful while it belongs to this very watermark.
+  const partial = state.partial && state.partial.for === (state.lastActivityAt || '') && state.partial.reached ? state.partial : null;
+  if (partial) console.log(`Crawl: resuming — everything active since ${cutoff.slice(0, 16)}, already covered down to ${String(partial.reached).slice(0, 16)} (${partial.pages} pages) ...`);
+  else console.log(`Crawl: everything active since ${cutoff.slice(0, 16)} ...`);
 
   // Everything below is plain HTTP. No browser: the token from --seed is all the
   // API needs, and skipping Chrome is what makes a 10-minute cadence viable.
@@ -485,17 +520,51 @@ async function crawl() {
   const FIELDS = 'assignee_id,city,coordinates,country,first_activity_at,geocode_error,group_id,import_id,inserted_at,latest_activity_at,postal_code,region,stage_id,street1,street2,tenant_id,title,updated_at';
   // Report each page and how far back we've walked, so the timestamp marching
   // toward the cutoff is visible proof it's still moving.
+  const pageUrl = (p) => `${API}/loci/es_search?fields=${encodeURIComponent(FIELDS)}&sort=-latest_activity_at&limit=100&page=${p}`;
+  const getPage = async (p) => {
+    const r = await srFetch(pageUrl(p));
+    if (tokenDead) return { tokenDead: true };
+    let j = null;
+    if (r) { try { j = await r.json(); } catch (e) { j = null; } }
+    if (!j) return { failed: true, status: r ? r.status : 0 };
+    return { rows: (j && j.data) || [] };
+  };
+  const at = (row) => (row.attributes || {}).latest_activity_at || '';
   const found = await (async () => {
-    const out = []; let newest = '', sample = null, body = '';
-    for (let p = 1; p <= 1000; p++) {
-      const r = await srFetch(`${API}/loci/es_search?fields=${encodeURIComponent(FIELDS)}&sort=-latest_activity_at&limit=100&page=${p}`);
-      if (tokenDead) return { rows: out, newest, pages: p, capped: false, tokenDead: true };
-      let j = null;
-      if (r) { try { j = await r.json(); } catch (e) { j = null; } }
+    const out = []; let newest = partial ? partial.newest : '', sample = null, body = '';
+    let start = 1;
+    if (partial) {
+      // Resume. Pages are offsets into a list that moved since the last tick:
+      // new activity pushes everything DOWN (so the page we stopped on now holds
+      // rows we already have), a deleted lead pulls everything UP (so it could
+      // hold rows we have never seen). Neither is safe to assume, so probe: step
+      // back while a page starts below where we got to, step forward while a
+      // page ends above it, and begin on the page that straddles `reached`. The
+      // overlap that leaves is a page or two of repeats, which latest-wins
+      // absorbs; a skipped row would be a hole the watermark then hides forever.
+      let p = Math.max(1, partial.pages);
+      for (let probes = 0; probes < 50; probes++) {
+        const g = await getPage(p);
+        if (g.tokenDead) return { rows: out, newest, pages: p, capped: false, tokenDead: true };
+        if (g.failed) return { rows: out, newest, pages: p, capped: false, failedAt: p, status: g.status, body };
+        if (!g.rows.length) { if (p === 1) break; p--; continue; }   // list shrank below us
+        const first = at(g.rows[0]), last = at(g.rows[g.rows.length - 1]);
+        if (!first || !last) break;                                  // shape problem; the main loop reports it
+        if (first < partial.reached && p > 1) { p--; continue; }     // rows shifted up: step back
+        if (last > partial.reached) { p++; continue; }               // all already covered: step forward
+        break;
+      }
+      start = p;
+      process.stdout.write(`\r  resuming at page ${start}   `);
+    }
+    const budget = MAX_PAGES ? start + MAX_PAGES - 1 : 1000;
+    for (let p = start; p <= 1000; p++) {
+      const g = await getPage(p);
+      if (g.tokenDead) return { rows: out, newest, pages: p, capped: false, tokenDead: true };
       // A page that never came back is not the same as reaching the end of the
       // list, and treating it as one silently truncates the delta. Say so.
-      if (!j) return { rows: out, newest, pages: p, capped: false, failedAt: p, status: r ? r.status : 0, body };
-      const rows = (j && j.data) || [];
+      if (g.failed) return { rows: out, newest, pages: p, capped: false, failedAt: p, status: g.status, body };
+      const rows = g.rows;
       if (!rows.length) break;
       // Keep the first row we ever see. If the scan comes back empty, this is
       // what says whether the shape changed underneath us vs. genuinely nothing
@@ -503,16 +572,19 @@ async function crawl() {
       if (!sample) sample = { id: rows[0].id, keys: Object.keys(rows[0].attributes || {}), attrs: rows[0].attributes || {} };
       let oldest = '';
       for (const row of rows) {
-        const at = (row.attributes || {}).latest_activity_at || '';
-        if (at > newest) newest = at;
-        oldest = at;
-        if (at >= cutoff) out.push({ id: row.id, ...(row.attributes || {}) });
+        const t = at(row);
+        if (t > newest) newest = t;
+        oldest = t;
+        if (t >= cutoff) out.push({ id: row.id, ...(row.attributes || {}) });
       }
       // No usable timestamp means the loop can never reach the cutoff and will
       // burn all 1000 pages to find nothing. Stop and report instead.
       if (!oldest) return { rows: out, newest, pages: p, capped: false, noTimestamp: true, sample };
       process.stdout.write(`\r  page ${p} — back to ${String(oldest).slice(0, 16)}, ${out.length} kept   `);
       if (oldest && oldest < cutoff) return { rows: out, newest, pages: p, capped: false, sample };
+      // Out of pages for this tick. Stop at the page boundary, re-pull what we
+      // have, and leave a marker so the next tick picks up below `oldest`.
+      if (p >= budget) return { rows: out, newest, pages: p, capped: false, partial: { reached: oldest }, sample };
     }
     return { rows: out, newest, pages: 1000, capped: true, sample };
   })();
@@ -524,6 +596,7 @@ async function crawl() {
   }
   if (found.noTimestamp) console.log('  NOTE: rows came back with no latest_activity_at — the API shape changed, so the cutoff can never be reached.');
   if (found.capped) console.log('  NOTE: hit the 100k page ceiling — the delta is unusually big. Consider a full re-crawl.');
+  if (found.partial) console.log(`  NOTE: stopped after ${MAX_PAGES} pages (back to ${String(found.partial.reached).slice(0, 16)}, cutoff ${cutoff.slice(0, 16)}) — the next run continues from there.`);
   console.log(`  ${found.rows.length.toLocaleString()} leads changed (${found.pages} page${found.pages === 1 ? '' : 's'} scanned)`);
   // A zero-row scan is the case worth explaining, because it is indistinguishable
   // from a quiet weekend unless you can see what the API actually returned.
@@ -599,8 +672,24 @@ async function crawl() {
   // scan page: advancing past it puts it permanently out of reach, since it is
   // older than every future cutoff. Re-pulling is latest-wins, so re-scanning
   // the window costs time and nothing else.
-  if (found.newest && !found.failedAt && !repullFailed) writeFileSync(STATE, JSON.stringify({ lastActivityAt: found.newest, lastRun: new Date().toISOString() }, null, 2));
-  else if (found.failedAt || repullFailed) console.log('  (watermark left where it was, so the next run re-scans this window)');
+  //
+  // A run that ran out of pages is the one case where the store IS whole for
+  // part of the window: every lead down to `reached` was re-pulled. That gets
+  // recorded as `partial`, keyed to the watermark it belongs to, and the real
+  // watermark stays put until a later run reaches the cutoff. Nothing is ever
+  // skipped: a lead that gets new activity while the window is being walked
+  // moves above `newest`, where the first tick after the watermark advances
+  // finds it, and the resume probe above never starts below `reached`.
+  let persisted = state.lastActivityAt || null;
+  if (found.failedAt || repullFailed) {
+    console.log(`  (watermark left where it was, so the next run re-scans ${partial ? 'the rest of' : ''} this window)`);
+  } else if (found.partial && found.newest) {
+    writeFileSync(STATE, JSON.stringify({ ...state, partial: { for: state.lastActivityAt || '', newest: found.newest, reached: found.partial.reached, pages: found.pages, at: new Date().toISOString() } }, null, 2));
+    console.log('  (watermark left where it was; progress saved, the next run resumes the scan)');
+  } else if (found.newest) {
+    persisted = found.newest;
+    writeFileSync(STATE, JSON.stringify({ lastActivityAt: found.newest, lastRun: new Date().toISOString() }, null, 2));
+  }
 
   // Record the CRAWL, not the push. The Ops banner used to read the knocking
   // table's created_at, which a --skip-crawl recompile also bumps — so it would
@@ -617,15 +706,16 @@ async function crawl() {
   // (observed 2026-08-07). Same on_conflict upsert scripts/sync-marker.sh uses,
   // which is why __sr_health__ stayed current through all of it.
   try {
-    const ANON2 = (readFileSync(join(ROOT, 'index.html'), 'utf8').match(/eyJ[A-Za-z0-9_.-]{50,}/) || [])[0];
+    const ANON2 = DRY ? null : (readFileSync(join(ROOT, 'index.html'), 'utf8').match(/eyJ[A-Za-z0-9_.-]{50,}/) || [])[0];
     if (ANON2) {
       const H2 = { apikey: ANON2, Authorization: `Bearer ${ANON2}`, 'Content-Type': 'application/json' };
       const mk = await fetch(`${SB}/rest/v1/report_config?on_conflict=manager`, {
         method: 'POST', headers: { ...H2, Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify([{ manager: '__knock_sync__', config: {
           crawled_at: new Date().toISOString(),
-          watermark: found.newest || null,
+          watermark: persisted,
           leads_changed: found.rows.length,
+          ...(found.partial ? { partial: { reached: found.partial.reached, pages: found.pages } } : {}),
         } }]),
       });
       // Say so rather than swallowing it. A stale marker is indistinguishable

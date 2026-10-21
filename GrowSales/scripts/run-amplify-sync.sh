@@ -25,6 +25,9 @@ mkdir -p imports/done
 # must not collide with the next one, since two Chromes on one profile is the
 # "profile in use" failure. Skipping costs nothing — the next run catches up
 # from the watermark in the knocking table.
+# Paused from the dashboard (Live badge > Pause). Skip without a marker, so no red and no email.
+bash scripts/paused.sh tds && { echo "$(date) paused from dashboard, skipping" >> imports/done/amplify-sync.log; exit 0; }
+
 PID=imports/done/amplify-sync.pid
 if [ -f "$PID" ] && kill -0 "$(cat "$PID")" 2>/dev/null; then
   echo "$(date) previous run (pid $(cat "$PID")) still going, skipping this tick" >> imports/done/amplify-sync.log
@@ -78,7 +81,6 @@ if [ -n "$failed" ]; then
       msg="Amplify login expired:$failed. Run: node scripts/amplify-company-sync.mjs --source $first --login"
       fix="node scripts/amplify-company-sync.mjs --source $first --login" ;;
   esac
-  /usr/bin/osascript -e "display notification \"$msg\" with title \"Grow · Amplify Sync\" sound name \"Basso\"" || true
   bash scripts/sync-marker.sh amplify_sync fail "$msg" "$fix" "knock schedule"
   exit 3
 fi

@@ -5,6 +5,8 @@ its data fresh, and the routines around ISP lead files, knocking reports, pay
 and meetings. You do not need to read code to run it. Claude Code does the
 heavy lifting, and everything it needs to know is in this repo.
 
+**Read `PROCESSES.md` first.** It is the one-page process handoff (what runs where, your weekly calendar, a runbook per process, what is broken as of Oct 21 2026). This page is the machine setup that follows it.
+
 ## The fastest path
 
 1. Get a Mac laptop. The scheduled syncs only run on a Mac, and only while it is
