@@ -15,7 +15,7 @@ Four layers. The first two run with no laptop; the last two run on one Mac that 
 | Server syncs | Vercel serverless functions on daily crons: Bria sales, Sequifi users, Sequifi teams. The deals feed itself arrives hourly from the Rep Sales Google Sheet's Apps Script. | `GrowSales/api/*.js`, schedules in `vercel.json` | No |
 | Local jobs | launchd agents on the Mac: SalesRabbit knock crawl, Opendoor portal pulls, TDS Amplify crawl, ISP file intake, ISP workbooks and sector maps, Ezee address sheet, plus two task bots (install slots, and the runner behind the Sources page buttons). | `GrowSales/scripts/`, plists in `scripts/launchd/`, installed with `scripts/install-all-agents.sh` | Yes |
 
-**The one repo to clone** is this one, to `~/Grow` on the new Mac (paths assume that). It holds `GrowSales/`, the task bots, `RepText/`, the Grow Claude skills, `bootstrap.sh` for a new machine, and `docs/knowledge/` with the rules and traps in detail. Open Claude Code in that folder and say "Set me up. Follow HANDOFF.md."
+**The one repo to clone** is https://github.com/joshwolfer-grow/GrowHandoff (private), cloned to `~/Grow` on the new Mac (paths assume that). It holds `GrowSales/`, the task bots, `RepText/`, the Grow Claude skills, `bootstrap.sh` for a new machine, and `docs/knowledge/` with the rules and traps in detail. Open Claude Code in that folder and say "Set me up. Follow HANDOFF.md."
 
 **Upstream systems** and what each feeds:
 

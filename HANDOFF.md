@@ -15,7 +15,7 @@ heavy lifting, and everything it needs to know is in this repo.
 2. Install **Claude Code** (desktop app or `npm i -g @anthropic-ai/claude-code`).
 3. Clone this repo **into `~/Grow`** (the exact folder matters):
 
-       git clone <repo url> ~/Grow
+       git clone https://github.com/joshwolfer-grow/GrowHandoff.git ~/Grow
 
 4. Open Claude Code in `~/Grow` and say: **"Set me up. Follow HANDOFF.md."**
    It will run `bootstrap.sh` step by step and tell you what it needs from you.
